@@ -513,20 +513,21 @@ function connectWs() {
         else { currentLocation = null; }
         updateLocationButtons();
       }
-      if (msg.type === 'foundry-status') {
+      if (msg.type === 'peer-status' && msg.peer === 'foundry') {
         foundryConnected = msg.connected;
         document.getElementById('status-foundry').classList.toggle('connected', msg.connected);
       }
-      if (msg.type === 'foundry-event') {
-        if (msg.event === 'eval-result') {
-          document.getElementById('eval-result').textContent = msg.result;
-        } else if (msg.event === 'command-ok' && msg.command === 'eval') {
-          if (!document.getElementById('eval-result').textContent || document.getElementById('eval-result').textContent === '...') {
-            document.getElementById('eval-result').textContent = '(ok)';
-          }
+      if (msg.type === 'peer-event' && msg.source === 'foundry') {
+        // roll/eval results now arrive folded into command-ok (the bridge
+        // returns handler data rather than emitting separate *-result events).
+        if (msg.event === 'command-ok' && msg.command === 'eval') {
+          document.getElementById('eval-result').textContent =
+            msg.result !== undefined ? msg.result : '(ok)';
+        } else if (msg.event === 'command-ok' && msg.command === 'roll') {
+          toast(`Roll ${msg.formula} = ${msg.total}`);
         } else if (msg.event === 'command-ok') toast(`Foundry: ${msg.command}`);
         else if (msg.event === 'command-error') toast(`Foundry: ${msg.error}`, true);
-        else if (msg.event === 'roll-result') toast(`Roll ${msg.formula} = ${msg.total}`);
+        else if (msg.event === 'unknown-command') toast(`Foundry: unknown command ${msg.command}`, true);
       }
     } catch {}
   });
@@ -543,7 +544,7 @@ function connectWs() {
 
 function sendFoundryCommand(command, params = {}) {
   if (remoteWs && remoteWs.readyState === WebSocket.OPEN) {
-    remoteWs.send(JSON.stringify({ type: 'foundry-command', command, ...params }));
+    remoteWs.send(JSON.stringify({ type: 'peer-command', target: 'foundry', command, ...params }));
   }
 }
 

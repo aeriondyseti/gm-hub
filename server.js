@@ -3,7 +3,7 @@ import { join } from "path";
 
 const DATA_PATH = join(import.meta.dir, "data", "state.json");
 const PRESETS_PATH = join(import.meta.dir, "data", "presets.json");
-const PUBLIC_DIR = join(import.meta.dir, "public");
+const CLIENTS_DIR = join(import.meta.dir, "clients");
 const PORT = 3001;
 
 // Ensure data dir exists
@@ -38,14 +38,55 @@ function saveState(data) {
 
 let state = loadState();
 
-const clients = new Set();
-let foundryClient = null;
+// Every open WebSocket — browser clients (overlay/control/remote) AND
+// named peers (foundry, hex, …). Used for state/event broadcast.
+const sockets = new Set();
+
+// Named peers only: peer name → its WebSocket. A peer joins this map by
+// sending `{type:"identify", peer:"<name>"}`. Commands are routed here.
+const peers = new Map();
+
+// In-flight HTTP→peer commands awaiting their `peer-event` reply, keyed by
+// requestId. Each entry: { resolve, timeout }. Replaces the old per-socket
+// `_httpHandler` slot, which clobbered itself under concurrent commands.
+const pendingResponses = new Map();
+let nextRequestId = 1;
 
 function broadcast(message) {
   const payload = JSON.stringify(message);
-  for (const ws of clients) {
+  for (const ws of sockets) {
     if (ws.readyState === 1) ws.send(payload);
   }
+}
+
+// Tell every open socket whether a named peer is connected.
+function broadcastPeerStatus(name, connected) {
+  broadcast({ type: 'peer-status', peer: name, connected });
+}
+
+// Route a command to a named peer and wait (up to 10s) for the matching
+// `peer-event` reply. Returns the reply object, or an `{error}` object on
+// timeout / peer-not-connected. The peer must echo the requestId back.
+function routeCommandToPeer(name, command, params) {
+  const ws = peers.get(name);
+  if (!ws || ws.readyState !== 1) {
+    return Promise.resolve({ error: `peer "${name}" not connected` });
+  }
+  const requestId = `req-${nextRequestId++}`;
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      pendingResponses.delete(requestId);
+      resolve({ error: `timeout waiting for peer "${name}"` });
+    }, 10000);
+    pendingResponses.set(requestId, { resolve, timeout });
+    ws.send(JSON.stringify({
+      type: 'peer-command',
+      target: name,
+      command,
+      requestId,
+      ...params,
+    }));
+  });
 }
 
 function getMimeType(path) {
@@ -59,8 +100,8 @@ function getMimeType(path) {
 }
 
 function serveStatic(path) {
-  const filePath = join(PUBLIC_DIR, path);
-  if (!filePath.startsWith(PUBLIC_DIR) || !existsSync(filePath)) {
+  const filePath = join(CLIENTS_DIR, path);
+  if (!filePath.startsWith(CLIENTS_DIR) || !existsSync(filePath)) {
     return new Response("Not Found", { status: 404 });
   }
   const content = readFileSync(filePath);
@@ -130,38 +171,20 @@ const server = Bun.serve({
       return Response.json(state);
     }
 
-    // Foundry bridge — forward commands via HTTP and wait for response
-    if (url.pathname === "/api/foundry" && req.method === "POST") {
-      if (!foundryClient || foundryClient.readyState !== 1) {
-        return Response.json({ error: "Foundry not connected" }, { status: 503 });
+    // Forward a command to a named peer via HTTP and wait for its reply.
+    //   POST /api/peers/:name/command   { command, ...params }
+    // The matching `peer-event` (by requestId) resolves the request; a
+    // missing/disconnected peer or a 10s silence yields an error status.
+    const peerCmdMatch = url.pathname.match(/^\/api\/peers\/([^/]+)\/command$/);
+    if (peerCmdMatch && req.method === "POST") {
+      const name = decodeURIComponent(peerCmdMatch[1]);
+      if (!peers.has(name)) {
+        return Response.json({ error: `peer "${name}" not connected` }, { status: 503 });
       }
-      const body = await req.json();
-      const msg = { type: "foundry-command", ...body };
-
-      // Wait for the foundry-event response
-      return new Promise((resolve) => {
-        const timeout = setTimeout(() => {
-          cleanup();
-          resolve(Response.json({ error: "Timeout waiting for Foundry response" }, { status: 504 }));
-        }, 10000);
-
-        function handler(ws, message) {
-          try {
-            const evt = JSON.parse(message);
-            if (evt.type !== "foundry-event") return;
-            cleanup();
-            resolve(Response.json(evt));
-          } catch {}
-        }
-
-        function cleanup() {
-          clearTimeout(timeout);
-          foundryClient._httpHandler = null;
-        }
-
-        foundryClient._httpHandler = handler;
-        foundryClient.send(JSON.stringify(msg));
-      });
+      const { command, ...params } = await req.json();
+      const reply = await routeCommandToPeer(name, command, params);
+      const status = reply.error ? 504 : 200;
+      return Response.json(reply, { status });
     }
 
     // Kenku FM proxy – client sends X-Kenku-Url header with the target base URL
@@ -203,44 +226,54 @@ const server = Bun.serve({
   websocket: {
     idleTimeout: 120,
     open(ws) {
-      clients.add(ws);
+      sockets.add(ws);
       ws.send(JSON.stringify({ type: "state-update", state }));
-      ws.send(JSON.stringify({ type: "foundry-status", connected: foundryClient !== null }));
+      // Tell the newcomer which peers are already online.
+      for (const name of peers.keys()) {
+        ws.send(JSON.stringify({ type: "peer-status", peer: name, connected: true }));
+      }
     },
     close(ws) {
-      clients.delete(ws);
-      if (ws === foundryClient) {
-        foundryClient = null;
-        broadcast({ type: "foundry-status", connected: false });
+      sockets.delete(ws);
+      // If a named peer dropped, remove it and announce the disconnect.
+      if (ws._peerName && peers.get(ws._peerName) === ws) {
+        peers.delete(ws._peerName);
+        broadcastPeerStatus(ws._peerName, false);
       }
     },
     message(ws, message) {
       try {
         const msg = JSON.parse(message);
 
-        // Foundry bridge identification
-        if (msg.type === "identify" && msg.client === "foundry") {
-          foundryClient = ws;
-          broadcast({ type: "foundry-status", connected: true });
+        // A peer announces itself: { type:"identify", peer:"<name>" }.
+        if (msg.type === "identify" && msg.peer) {
+          peers.set(msg.peer, ws);
+          ws._peerName = msg.peer;
+          broadcastPeerStatus(msg.peer, true);
           return;
         }
 
-        // Route commands to Foundry
-        if (msg.type === "foundry-command") {
-          if (foundryClient && foundryClient.readyState === 1) {
-            foundryClient.send(JSON.stringify(msg));
+        // Route a command to its target peer.
+        if (msg.type === "peer-command") {
+          const target = peers.get(msg.target);
+          if (target && target.readyState === 1) {
+            target.send(JSON.stringify(msg));
           }
           return;
         }
 
-        // Broadcast Foundry events to all other clients
-        if (msg.type === "foundry-event") {
-          // If an HTTP request is waiting for this response, deliver it
-          if (ws._httpHandler) {
-            ws._httpHandler(ws, message);
+        // A peer's event: resolve any waiting HTTP command (matched by
+        // requestId), then fan the event out to every other socket so
+        // browser clients and sibling peers can react.
+        if (msg.type === "peer-event") {
+          if (msg.requestId && pendingResponses.has(msg.requestId)) {
+            const { resolve, timeout } = pendingResponses.get(msg.requestId);
+            clearTimeout(timeout);
+            pendingResponses.delete(msg.requestId);
+            resolve(msg);
           }
           const payload = JSON.stringify(msg);
-          for (const c of clients) {
+          for (const c of sockets) {
             if (c !== ws && c.readyState === 1) c.send(payload);
           }
           return;
@@ -267,7 +300,7 @@ const server = Bun.serve({
   },
 });
 
-console.log(`Keys to Perfection Overlay running on http://localhost:${PORT}`);
+console.log(`Keys to Perfection Hub running on http://localhost:${PORT}`);
 console.log(`  Overlay: http://localhost:${PORT}/overlay`);
 console.log(`  Control: http://localhost:${PORT}/control`);
 console.log(`  Remote:  http://localhost:${PORT}/remote`);

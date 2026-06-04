@@ -1,0 +1,154 @@
+# ktp-hub
+
+The session-state hub for **Keys to Perfection**. Bun server on port
+`3001` that owns the shared session state, broadcasts changes over
+WebSocket, and acts as the message bus between named **peers**
+(Foundry bridge, hexploration, future tools).
+
+The hub is also the host for a few browser **clients**: the OBS
+overlay, plus GM-facing control and remote pages. The overlay is the
+hub's canonical *projection* — its read-only render targeting OBS. The
+control and remote are the GM's *input* surfaces and will eventually
+move to a sibling `ktp-console/` repo (see backlog in
+`../hexploration/ROADMAP.md`).
+
+## Taxonomy
+
+| Term     | What                                                | Examples                              |
+|----------|-----------------------------------------------------|---------------------------------------|
+| **Hub**  | This server. Owns state, runs the bus + REST + WS.  | `ktp-hub/` (this repo)                |
+| **Peers**| WS-connected tools exchanging commands and events.  | `ktp-foundry-bridge`, `hexploration`  |
+| **Clients** | Browser pages that consume the hub's HTTP+WS.    | `overlay.html`, `control.html`, `remote.html` |
+
+Peers are symmetric on the wire — any peer can send commands or events
+at any time. The hub routes between them. Clients are HTTP/WS consumers
+that display state and POST mutations; they don't participate in the
+peer protocol.
+
+## Sibling repos
+
+Lives in `~/Development/ktp/` alongside:
+
+- **`../hexploration/`** — TTRPG hexploration tool. Will connect as the
+  `hex` peer and emit typed events that map onto overlay surfaces
+  (e.g. `day-advanced` → scene banner). See `../hexploration/ROADMAP.md`.
+- **`../ktp-foundry-bridge/`** — Foundry VTT module that connects as the
+  `foundry` peer. Exposes a command registry; routes commands from the
+  hub into Foundry and events from Foundry out to other peers.
+
+The `~/Development/ktp/README.md` has a system diagram.
+
+## Layout
+
+```
+ktp-hub/
+├── server.js              — Bun server, all routes inline
+├── package.json           — bun runtime only, no deps
+├── clients/               — browser pages served by the hub
+│   ├── overlay.html       — transparent OBS browser source projection
+│   ├── control.html       — GM control surface (planned move → ktp-console/)
+│   └── remote.html        — touch-friendly remote (planned move → ktp-console/)
+└── data/
+    ├── state.json         — runtime session state (scene/NPC/mood/lore)
+    └── presets.json       — NPC and location library for the campaign
+```
+
+## Commands
+
+```bash
+bun run server.js          # starts on :3001
+# or
+npm start                  # same thing (package.json script wraps it)
+```
+
+Then open:
+- http://localhost:3001/overlay  (set as OBS browser source)
+- http://localhost:3001/control
+- http://localhost:3001/remote
+
+## Protocol (v1.4+)
+
+Peers connect to `ws://localhost:3001/ws` and identify themselves:
+
+```json
+{ "type": "identify", "peer": "foundry" }
+```
+
+The hub maintains a `peers` registry and routes generalized messages
+between them.
+
+### Hub → peer
+
+```json
+{
+  "type": "peer-command",
+  "target": "foundry",
+  "command": "show-portrait",
+  "requestId": "req-42",
+  "actorName": "Amara"
+}
+```
+
+### Peer → hub
+
+```json
+{
+  "type": "peer-event",
+  "source": "foundry",
+  "event": "command-ok",
+  "requestId": "req-42",
+  "command": "show-portrait"
+}
+```
+
+When a `peer-event` carries a `requestId` that matches a pending HTTP
+request (see below), the hub resolves it. Either way the event is
+broadcast to every other connected socket — both peers and clients —
+so anyone listening can react.
+
+### Hub broadcasts (status)
+
+```json
+{ "type": "peer-status", "peer": "foundry", "connected": true }
+```
+
+Fired when any named peer connects or disconnects. On open, the hub
+sends one `peer-status` per known peer so the new connection knows
+who's online.
+
+## HTTP API
+
+- `GET /api/state` — current scene/NPC/mood/lore-feed state.
+- `PUT /api/state` — partial merge, persists to `data/state.json`,
+  broadcasts `state-update`.
+- `POST /api/lore/push` `{text}` — append lore-feed entry (capped at 6).
+- `POST /api/lore/clear` — empty the feed.
+- `GET /api/presets` / `PUT /api/presets` — campaign NPC and location
+  library.
+- `POST /api/peers/:name/command` `{command, ...params}` — forward a
+  command to a connected named peer, wait up to 10s for the matching
+  `peer-event` response (matched by `requestId`).
+- `POST /api/kenku/*` — passthrough proxy to a local Kenku FM instance
+  for audio control. Caller supplies the Kenku base URL via the
+  `X-Kenku-Url` header.
+
+## Things to know
+
+- **State is opaque to peers.** Only browser clients introspect
+  `state.json`. Peers exchange peer-* messages and don't see the hub's
+  state directly.
+- **`requestId` is required** for any command that expects a response.
+  The hub keys pending responses by it; without it, an HTTP forward
+  always times out at 10s. Peers respond by echoing back the same
+  `requestId` in their `peer-event`.
+- **Bun-specific APIs.** `import.meta.dir`, `Bun.serve`,
+  `server.upgrade()`. Not Node-compatible without a runtime swap.
+- **No build step.** Edit `server.js` and restart; edit a
+  `clients/*.html` and refresh.
+
+## Connected peers
+
+| Peer name  | Repo                       | Status                         |
+|------------|----------------------------|--------------------------------|
+| `foundry`  | `../ktp-foundry-bridge/`   | v1.4.0+ (uses generalized API) |
+| `hex`      | `../hexploration/`         | planned (see hex Phase 3)      |

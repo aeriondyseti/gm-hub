@@ -1,5 +1,5 @@
 {
-  "name": "ktp-overlay",
+  "name": "ktp-hub",
   "version": "1.0.0",
   "scripts": {
     "start": "bun run server.js"
