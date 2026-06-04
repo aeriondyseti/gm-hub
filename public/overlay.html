@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Keys to Perfection — Overlay</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+
+  :root {
+    --mood-color: #ddc888;
+    --mood-glow: rgba(196, 162, 101, 0.12);
+  }
+
+  /* ── Frame ── */
+  #overlay-frame {
+    position: absolute; inset: 0; overflow: hidden;
+  }
+  #mood-vignette {
+    position: absolute; inset: 0; pointer-events: none; z-index: 5;
+    box-shadow: inset 0 0 240px 80px var(--mood-glow);
+    transition: box-shadow 2s ease;
+  }
+  .border-outer {
+    position: absolute; inset: 0; pointer-events: none; z-index: 10;
+    border: 4px solid rgba(0, 0, 0, 0.6); border-radius: 2px;
+    transition: border-color 2s ease;
+  }
+  .border-inner {
+    position: absolute; inset: 8px; pointer-events: none; z-index: 10;
+    border: 2px solid rgba(255, 240, 200, 0.25); border-radius: 2px;
+    transition: border-color 2s ease;
+  }
+
+  /* ── Corners ── */
+  .corner { position: absolute; z-index: 15; width: 160px; height: 160px; }
+  .corner-tl { top: 4px; left: 4px; }
+  .corner-tr { top: 4px; right: 4px; transform: scaleX(-1); }
+  .corner-bl { bottom: 4px; left: 4px; transform: scaleY(-1); }
+  .corner-br { bottom: 4px; right: 4px; transform: scale(-1, -1); }
+
+  /* ── Scene Banner ── */
+  #scene-banner {
+    position: absolute; top: 20px; left: 50%; z-index: 20;
+    transform: translate(-50%, -100%); opacity: 0;
+    transition: none; pointer-events: none;
+  }
+  #scene-banner.visible {
+    animation: slideInFromTop 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  #scene-banner.hiding {
+    animation: slideOutToTop 0.5s ease-in forwards;
+  }
+  .banner-card {
+    background:
+      radial-gradient(ellipse at 20% 50%, rgba(139, 116, 65, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(101, 78, 40, 0.06) 0%, transparent 40%),
+      linear-gradient(180deg, #f4e8c1 0%, #e8d5a3 30%, #dcc48e 70%, #d4b978 100%);
+    padding: 20px 72px 16px; border-radius: 4px;
+    border: 3px solid #c9ad6f;
+    box-shadow: 0 6px 32px rgba(0,0,0,0.35), inset 0 2px 0 rgba(255,255,255,0.2);
+    text-align: center; position: relative; min-width: 400px;
+  }
+  .banner-accent {
+    position: absolute; top: -2px; left: 20%; right: 20%; height: 4px;
+    background: linear-gradient(90deg, transparent, #c9ad6f, transparent);
+  }
+  .banner-location {
+    font-family: 'Cinzel', serif; font-size: 32px; font-weight: 700;
+    color: #3d2b1f; letter-spacing: 5px; text-transform: uppercase;
+    line-height: 1.2; text-shadow: 0 2px 0 rgba(255,255,255,0.3);
+  }
+  .banner-subtitle {
+    font-family: 'Cormorant Garamond', serif; font-size: 24px;
+    font-weight: 500; font-style: italic; color: #5a4a3a;
+    margin-top: 4px; letter-spacing: 1.6px;
+  }
+  .banner-divider { margin-top: 10px; display: flex; justify-content: center; }
+
+  /* ── NPC Nameplate ── */
+  #npc-nameplate {
+    position: absolute; bottom: 100px; left: 50%; z-index: 20;
+    transform: translate(-50%, 30px); opacity: 0;
+    transition: none; pointer-events: none;
+  }
+  #npc-nameplate.visible {
+    animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  #npc-nameplate.hiding {
+    animation: fadeOutDown 0.4s ease-in forwards;
+  }
+  .npc-card {
+    background: linear-gradient(135deg, #2a1f14 0%, #1a1209 100%);
+    padding: 16px 64px 14px; border-radius: 4px;
+    border: 2px solid #c9ad6f; border-bottom: 5px solid #ddc888;
+    box-shadow: 0 6px 28px rgba(0,0,0,0.5); text-align: center;
+    min-width: 360px;
+  }
+  .npc-name {
+    font-family: 'Cinzel', serif; font-size: 30px; font-weight: 600;
+    color: #e8d5a3; letter-spacing: 4px; text-transform: uppercase;
+  }
+  .npc-title {
+    font-family: 'Cormorant Garamond', serif; font-size: 22px;
+    font-weight: 400; font-style: italic; color: #a08c6a;
+    margin-top: 2px; letter-spacing: 1.6px;
+  }
+
+  /* ── Lore Feed ── */
+  #lore-feed {
+    position: absolute; top: 180px; right: 28px; z-index: 20;
+    width: 560px; max-height: calc(100% - 280px);
+    display: flex; flex-direction: column; align-items: flex-end;
+    pointer-events: none; overflow: hidden;
+  }
+  .lore-entry {
+    background: linear-gradient(135deg, rgba(26, 18, 9, 0.85) 0%, rgba(15, 11, 6, 0.9) 100%);
+    border-right: 4px solid #c9ad6f; border-radius: 4px;
+    padding: 12px 20px; margin-bottom: 12px; max-width: 100%;
+    animation: loreFeedIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transition: opacity 0.8s ease;
+  }
+  .lore-entry-text {
+    font-family: 'Cormorant Garamond', serif; font-size: 24px;
+    font-weight: 400; font-style: italic; color: #d4c4a0;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+    line-height: 1.45; letter-spacing: 0.6px; text-align: right;
+  }
+
+  /* ── Bottom Panel ── */
+  #bottom-panel {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 18;
+    height: 72px;
+    background: linear-gradient(180deg, rgba(10, 8, 5, 0.0) 0%, rgba(10, 8, 5, 0.7) 30%, rgba(10, 8, 5, 0.85) 100%);
+    border-top: 1px solid rgba(201, 173, 111, 0.15);
+    pointer-events: none;
+  }
+
+  /* ── Session Badge ── */
+  #session-badge {
+    position: absolute; bottom: 18px; left: 176px; z-index: 20;
+    display: flex; align-items: center; gap: 20px; opacity: 0.85;
+  }
+  .session-campaign {
+    font-family: 'Cinzel Decorative', serif; font-size: 28px; font-weight: 400;
+    color: #ddc888; letter-spacing: 4px; text-transform: uppercase;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+  }
+  .session-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: #c9ad6f;
+  }
+  .session-number {
+    font-family: 'Cormorant Garamond', serif; font-size: 30px; font-weight: 500;
+    color: #a08c6a; letter-spacing: 2px; text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+  }
+
+  /* ── Mood Dot ── */
+  #mood-dot {
+    position: absolute; bottom: 18px; right: 28px; z-index: 20; opacity: 0.45;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--mood-color);
+    box-shadow: 0 0 12px var(--mood-color);
+    animation: borderPulse 3s ease-in-out infinite;
+  }
+
+  /* ── Animations ── */
+  @keyframes slideInFromTop {
+    from { transform: translate(-50%, -100%); opacity: 0; }
+    to { transform: translate(-50%, 0); opacity: 1; }
+  }
+  @keyframes slideOutToTop {
+    from { transform: translate(-50%, 0); opacity: 1; }
+    to { transform: translate(-50%, -100%); opacity: 0; }
+  }
+  @keyframes fadeInUp {
+    from { transform: translate(-50%, 30px); opacity: 0; }
+    to { transform: translate(-50%, 0); opacity: 1; }
+  }
+  @keyframes fadeOutDown {
+    from { transform: translate(-50%, 0); opacity: 1; }
+    to { transform: translate(-50%, 20px); opacity: 0; }
+  }
+  @keyframes loreFeedIn {
+    from { transform: translateY(-16px); opacity: 0; max-height: 0; margin-bottom: 0; padding: 0 20px; }
+    to { transform: translateY(0); opacity: 1; max-height: 160px; margin-bottom: 12px; padding: 12px 20px; }
+  }
+  @keyframes borderPulse {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 0.65; }
+  }
+</style>
+</head>
+<body>
+
+<div id="overlay-frame">
+  <div id="mood-vignette"></div>
+  <div class="border-outer"></div>
+  <div class="border-inner"></div>
+
+  <!-- Corners -->
+  <svg class="corner corner-tl" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+    <g fill="none" stroke="#c9ad6f" stroke-width="1.2" opacity="0.55">
+      <path d="M8,72 Q8,8 72,8"/><path d="M16,72 Q16,16 72,16"/>
+      <path d="M8,72 L8,54 Q8,40 22,40 L40,40 Q54,40 54,26 L54,8"/>
+      <circle cx="8" cy="72" r="3" fill="#c9ad6f"/><circle cx="72" cy="8" r="2.5" fill="#c9ad6f"/>
+      <circle cx="30" cy="40" r="1.5" fill="#c9ad6f"/>
+      <path d="M20,60 Q16,50 28,46" stroke-width="0.8"/><path d="M46,20 Q50,16 60,14" stroke-width="0.8"/>
+    </g>
+  </svg>
+  <svg class="corner corner-tr" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+    <g fill="none" stroke="#c9ad6f" stroke-width="1.2" opacity="0.55">
+      <path d="M8,72 Q8,8 72,8"/><path d="M16,72 Q16,16 72,16"/>
+      <path d="M8,72 L8,54 Q8,40 22,40 L40,40 Q54,40 54,26 L54,8"/>
+      <circle cx="8" cy="72" r="3" fill="#c9ad6f"/><circle cx="72" cy="8" r="2.5" fill="#c9ad6f"/>
+      <circle cx="30" cy="40" r="1.5" fill="#c9ad6f"/>
+      <path d="M20,60 Q16,50 28,46" stroke-width="0.8"/><path d="M46,20 Q50,16 60,14" stroke-width="0.8"/>
+    </g>
+  </svg>
+  <svg class="corner corner-bl" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+    <g fill="none" stroke="#c9ad6f" stroke-width="1.2" opacity="0.55">
+      <path d="M8,72 Q8,8 72,8"/><path d="M16,72 Q16,16 72,16"/>
+      <path d="M8,72 L8,54 Q8,40 22,40 L40,40 Q54,40 54,26 L54,8"/>
+      <circle cx="8" cy="72" r="3" fill="#c9ad6f"/><circle cx="72" cy="8" r="2.5" fill="#c9ad6f"/>
+      <circle cx="30" cy="40" r="1.5" fill="#c9ad6f"/>
+      <path d="M20,60 Q16,50 28,46" stroke-width="0.8"/><path d="M46,20 Q50,16 60,14" stroke-width="0.8"/>
+    </g>
+  </svg>
+  <svg class="corner corner-br" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+    <g fill="none" stroke="#c9ad6f" stroke-width="1.2" opacity="0.55">
+      <path d="M8,72 Q8,8 72,8"/><path d="M16,72 Q16,16 72,16"/>
+      <path d="M8,72 L8,54 Q8,40 22,40 L40,40 Q54,40 54,26 L54,8"/>
+      <circle cx="8" cy="72" r="3" fill="#c9ad6f"/><circle cx="72" cy="8" r="2.5" fill="#c9ad6f"/>
+      <circle cx="30" cy="40" r="1.5" fill="#c9ad6f"/>
+      <path d="M20,60 Q16,50 28,46" stroke-width="0.8"/><path d="M46,20 Q50,16 60,14" stroke-width="0.8"/>
+    </g>
+  </svg>
+
+  <!-- Scene Banner -->
+  <div id="scene-banner">
+    <div class="banner-card">
+      <div class="banner-accent"></div>
+      <div class="banner-location" id="scene-location"></div>
+      <div class="banner-subtitle" id="scene-subtitle"></div>
+      <div class="banner-divider">
+        <svg viewBox="0 0 300 20" width="280" height="24" xmlns="http://www.w3.org/2000/svg">
+          <g fill="none" stroke="#c9ad6f" stroke-width="1" opacity="0.45">
+            <line x1="40" y1="10" x2="260" y2="10"/>
+            <circle cx="150" cy="10" r="2.5" fill="#c9ad6f"/>
+            <circle cx="133" cy="10" r="1.2" fill="#c9ad6f"/><circle cx="167" cy="10" r="1.2" fill="#c9ad6f"/>
+            <path d="M40,10 L48,5.5 L52,10 L48,14.5 Z" fill="#c9ad6f"/>
+            <path d="M260,10 L252,5.5 L248,10 L252,14.5 Z" fill="#c9ad6f"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- NPC Nameplate -->
+  <div id="npc-nameplate">
+    <div class="npc-card">
+      <div class="npc-name" id="npc-name"></div>
+      <div class="npc-title" id="npc-title"></div>
+    </div>
+  </div>
+
+  <!-- Lore Feed -->
+  <div id="lore-feed"></div>
+
+  <!-- Bottom Panel -->
+  <div id="bottom-panel"></div>
+
+  <!-- Session Badge -->
+  <div id="session-badge">
+    <span class="session-campaign">Keys to Perfection</span>
+    <span class="session-dot"></span>
+    <span class="session-number" id="session-number">Session 12</span>
+  </div>
+
+  <!-- Mood Dot -->
+  <div id="mood-dot"></div>
+</div>
+
+<script>
+const MOODS = {
+  neutral:    { color: '#ddc888', glow: 'rgba(196, 162, 101, 0.03)' },
+  tense:      { color: '#d94a2b', glow: 'rgba(217, 74, 43, 0.45)' },
+  mysterious: { color: '#7b5cb8', glow: 'rgba(123, 92, 184, 0.45)' },
+  festive:    { color: '#e8b520', glow: 'rgba(232, 181, 32, 0.5)' },
+  somber:     { color: '#4a7a7a', glow: 'rgba(74, 122, 122, 0.4)' },
+  dangerous:  { color: '#cc1a1a', glow: 'rgba(204, 26, 26, 0.5)' },
+};
+
+const MAX_LORE_VISIBLE = 6;
+let loreEntries = [];
+let prevState = {};
+
+// ── DOM refs ──
+const sceneBanner   = document.getElementById('scene-banner');
+const sceneLocation = document.getElementById('scene-location');
+const sceneSubtitle = document.getElementById('scene-subtitle');
+const npcNameplate  = document.getElementById('npc-nameplate');
+const npcName       = document.getElementById('npc-name');
+const npcTitle      = document.getElementById('npc-title');
+const loreFeed      = document.getElementById('lore-feed');
+const sessionNumber = document.getElementById('session-number');
+const moodVignette  = document.getElementById('mood-vignette');
+const moodDot       = document.getElementById('mood-dot');
+const root          = document.documentElement;
+
+// ── Toggle with animation ──
+function toggleElement(el, visible, prevVisible) {
+  if (visible === prevVisible) return;
+  if (visible) {
+    el.classList.remove('hiding');
+    // Force reflow to restart animation
+    void el.offsetWidth;
+    el.classList.add('visible');
+  } else {
+    el.classList.remove('visible');
+    el.classList.add('hiding');
+    el.addEventListener('animationend', () => {
+      if (!el.classList.contains('visible')) {
+        el.classList.remove('hiding');
+      }
+    }, { once: true });
+  }
+}
+
+// ── Render state ──
+function render(state) {
+  // Scene banner
+  sceneLocation.textContent = state.sceneLocation || '';
+  sceneSubtitle.textContent = state.sceneSubtitle || '';
+  sceneSubtitle.style.display = state.sceneSubtitle ? 'block' : 'none';
+  toggleElement(sceneBanner, state.sceneVisible, prevState.sceneVisible);
+
+  // NPC nameplate
+  npcName.textContent = state.npcName || '';
+  npcTitle.textContent = state.npcTitle || '';
+  npcTitle.style.display = state.npcTitle ? 'block' : 'none';
+  toggleElement(npcNameplate, state.npcVisible, prevState.npcVisible);
+
+  // Session
+  sessionNumber.textContent = state.session ? `Session ${state.session}` : '';
+
+  // Mood
+  const mood = MOODS[state.mood] || MOODS.neutral;
+  root.style.setProperty('--mood-color', mood.color);
+  root.style.setProperty('--mood-glow', mood.glow);
+
+  // Lore feed — check for new entries
+  if (state.loreFeed && state.loreFeed.length !== loreEntries.length) {
+    const incoming = state.loreFeed || [];
+
+    // Find new entries by comparing IDs
+    const existingIds = new Set(loreEntries.map(e => e.id));
+    const newEntries = incoming.filter(e => !existingIds.has(e.id));
+
+    loreEntries = [...incoming];
+
+    // Clear if empty
+    if (incoming.length === 0) {
+      loreFeed.innerHTML = '';
+    } else {
+      // Add new entries
+      newEntries.forEach(entry => {
+        const div = document.createElement('div');
+        div.className = 'lore-entry';
+        div.dataset.id = entry.id;
+        div.innerHTML = `<div class="lore-entry-text">"${escapeHtml(entry.text)}"</div>`;
+        loreFeed.appendChild(div);
+      });
+
+      // Trim to max visible
+      while (loreFeed.children.length > MAX_LORE_VISIBLE) {
+        loreFeed.removeChild(loreFeed.firstChild);
+      }
+
+      // Update opacity (newest = brightest)
+      const children = Array.from(loreFeed.children);
+      children.forEach((child, i) => {
+        const age = children.length - 1 - i;
+        child.style.opacity = Math.max(0.3, 1 - age * 0.2);
+      });
+    }
+  }
+
+  prevState = { ...state };
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ── WebSocket connection ──
+let ws;
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}/ws`);
+  ws.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'state-update' && msg.state) {
+        render(msg.state);
+      }
+    } catch (err) {
+      console.error('WS parse error:', err);
+    }
+  };
+  ws.onclose = () => setTimeout(connect, 1000);
+  ws.onerror = () => ws.close();
+}
+connect();
+
+// ── Initial state ──
+render({
+  sceneVisible: false, sceneLocation: '', sceneSubtitle: '',
+  npcVisible: false, npcName: '', npcTitle: '',
+  mood: 'neutral', loreFeed: [], session: '12',
+});
+</script>
+</body>
+</html>

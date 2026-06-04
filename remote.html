@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>DM Remote</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Alegreya+Sans:wght@300;400;500;700&family=Alegreya+Sans+SC:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep: #0a0d0f;
+    --bg-panel: #111618;
+    --bg-card: #181e22;
+    --bg-hover: #1f282e;
+    --border: #2a3540;
+    --border-glow: #00474f;
+    --teal: #00878a;
+    --teal-bright: #00b4b8;
+    --teal-dim: #00474f;
+    --amber: #c49a3c;
+    --amber-bright: #e8b94a;
+    --red: #8b2c3a;
+    --red-bright: #c94058;
+    --green: #2a6b4a;
+    --green-bright: #3daa6f;
+    --purple: #5b3a8c;
+    --purple-bright: #8a5ed0;
+    --text: #d4d8dc;
+    --text-dim: #7a8892;
+    --text-bright: #f0f2f4;
+    --radius: 8px;
+    --font-display: 'Cinzel', serif;
+    --font-body: 'Alegreya Sans', sans-serif;
+    --font-label: 'Alegreya Sans SC', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    background: var(--bg-deep);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 15px;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    -webkit-user-select: none; user-select: none;
+    touch-action: manipulation;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px 8px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #0e1316 0%, var(--bg-deep) 100%);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header h1 {
+    font-family: var(--font-display);
+    font-size: 16px; font-weight: 600; letter-spacing: 2px;
+    color: var(--teal-bright);
+    text-shadow: 0 0 20px rgba(0,135,138,0.3);
+  }
+  .status-dots { display: flex; gap: 8px; align-items: center; }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--red); transition: background 0.3s;
+  }
+  .status-dot.connected { background: var(--green-bright); box-shadow: 0 0 6px rgba(61,170,111,0.5); }
+  .status-dot-label { font-family: var(--font-label); font-size: 9px; color: var(--text-dim); letter-spacing: 1px; }
+
+  /* ── Sections ── */
+  .remote-grid {
+    padding: 12px;
+    display: flex; flex-direction: column; gap: 16px;
+    max-width: 600px; margin: 0 auto;
+    padding-bottom: 80px;
+  }
+  .section {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .section-header {
+    font-family: var(--font-label); font-size: 11px; font-weight: 700;
+    letter-spacing: 2.5px; text-transform: uppercase;
+    color: var(--text-dim); padding: 10px 14px 6px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-header .icon { font-size: 13px; }
+  .section-body { padding: 10px; }
+
+  /* ── Button Grid ── */
+  .btn-grid {
+    display: grid; gap: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  }
+  .btn-grid.wide { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  .btn-grid.macros { grid-template-columns: 1fr 1fr; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; padding: 14px 8px; min-height: 62px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text);
+    font-family: var(--font-body); font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s ease;
+    position: relative; overflow: hidden;
+    text-align: center; line-height: 1.2;
+  }
+  .btn:active {
+    transform: scale(0.95);
+    background: var(--bg-hover);
+  }
+  .btn .btn-icon { font-size: 18px; line-height: 1; }
+  .btn .btn-label { font-size: 11px; color: var(--text-dim); font-family: var(--font-label); letter-spacing: 0.5px; }
+
+  /* Active state for toggles */
+  .btn.active {
+    border-color: var(--teal);
+    background: rgba(0,135,138,0.12);
+    color: var(--teal-bright);
+    box-shadow: inset 0 0 20px rgba(0,135,138,0.08), 0 0 8px rgba(0,135,138,0.15);
+  }
+
+  /* Color accents */
+  .btn.mood-neutral   { border-left: 3px solid #6a8a9a; }
+  .btn.mood-tense     { border-left: 3px solid var(--red-bright); }
+  .btn.mood-mysterious { border-left: 3px solid var(--purple-bright); }
+  .btn.mood-triumphant { border-left: 3px solid var(--amber-bright); }
+  .btn.mood-somber    { border-left: 3px solid #4a6a8a; }
+  .btn.mood-eerie     { border-left: 3px solid #5a9a6a; }
+
+  .btn.macro {
+    min-height: 72px;
+    border: 1px solid var(--amber);
+    background: linear-gradient(135deg, rgba(196,154,60,0.06) 0%, var(--bg-card) 100%);
+  }
+  .btn.macro:active {
+    background: linear-gradient(135deg, rgba(196,154,60,0.15) 0%, var(--bg-hover) 100%);
+    box-shadow: 0 0 15px rgba(196,154,60,0.2);
+  }
+  .btn.macro .btn-icon { color: var(--amber); }
+
+  .btn.danger { border-color: var(--red); }
+  .btn.danger:active { background: rgba(139,44,58,0.2); }
+  .btn.danger .btn-icon { color: var(--red-bright); }
+
+  /* ── Lore Input ── */
+  .lore-input-row {
+    display: flex; gap: 8px; margin-top: 8px;
+  }
+  .lore-input {
+    flex: 1; padding: 10px 12px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text);
+    font-family: var(--font-body); font-size: 14px;
+    outline: none; transition: border-color 0.2s;
+  }
+  .lore-input:focus { border-color: var(--teal); }
+  .lore-input::placeholder { color: var(--text-dim); }
+
+  .btn-send {
+    padding: 10px 18px;
+    background: var(--teal-dim); border: 1px solid var(--teal);
+    border-radius: var(--radius); color: var(--teal-bright);
+    font-family: var(--font-label); font-size: 12px; font-weight: 700;
+    letter-spacing: 1px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-send:active {
+    background: var(--teal);
+    color: var(--bg-deep);
+    transform: scale(0.95);
+  }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px);
+    background: var(--bg-card); border: 1px solid var(--teal);
+    color: var(--teal-bright); padding: 10px 20px;
+    border-radius: 20px; font-family: var(--font-label);
+    font-size: 12px; letter-spacing: 1px; z-index: 200;
+    opacity: 0; transition: all 0.3s ease; pointer-events: none;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+  .toast.show {
+    opacity: 1; transform: translateX(-50%) translateY(0);
+  }
+  .toast.error { border-color: var(--red); color: var(--red-bright); }
+
+  /* ── Subtle background texture ── */
+  body::before {
+    content: '';
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at 20% 20%, rgba(0,71,79,0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(196,154,60,0.03) 0%, transparent 50%);
+    pointer-events: none; z-index: 0;
+  }
+  .remote-grid { position: relative; z-index: 1; }
+
+  /* ── Kenku volume slider ── */
+  .volume-row {
+    display: flex; align-items: center; gap: 10px; padding: 8px 4px 4px;
+  }
+  .volume-row label {
+    font-family: var(--font-label); font-size: 10px;
+    color: var(--text-dim); letter-spacing: 1px; min-width: 50px;
+  }
+  .volume-slider {
+    flex: 1; -webkit-appearance: none; appearance: none;
+    height: 4px; background: var(--border); border-radius: 2px;
+    outline: none;
+  }
+  .volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--teal); border: 2px solid var(--teal-bright);
+    cursor: pointer;
+  }
+
+  /* ── Connection config ── */
+  .config-row {
+    display: flex; gap: 6px; align-items: center;
+    padding: 4px 0;
+  }
+  .config-row label {
+    font-family: var(--font-label); font-size: 10px;
+    color: var(--text-dim); letter-spacing: 1px; min-width: 70px;
+  }
+  .config-input {
+    flex: 1; padding: 6px 8px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 4px; color: var(--text);
+    font-family: var(--font-body); font-size: 12px;
+    outline: none;
+  }
+  .config-input:focus { border-color: var(--teal); }
+
+  .config-toggle {
+    display: none;
+  }
+  .config-panel {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+  .config-toggle:checked ~ .config-panel {
+    max-height: 500px;
+  }
+  .config-trigger {
+    font-family: var(--font-label); font-size: 10px;
+    color: var(--text-dim); letter-spacing: 1px;
+    cursor: pointer; padding: 4px 0;
+    text-align: right;
+  }
+  .config-trigger:hover { color: var(--teal); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>⚔ DM Remote</h1>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div style="display:flex;align-items:center;gap:4px;">
+      <div class="status-dot" id="status-overlay"></div>
+      <span class="status-dot-label">OVR</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;">
+      <div class="status-dot" id="status-obs"></div>
+      <span class="status-dot-label">OBS</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;">
+      <div class="status-dot" id="status-kenku"></div>
+      <span class="status-dot-label">KFM</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;">
+      <div class="status-dot" id="status-foundry"></div>
+      <span class="status-dot-label">VTT</span>
+    </div>
+  </div>
+</div>
+
+<div class="remote-grid">
+
+  <!-- ── Macros ── -->
+  <div class="section">
+    <div class="section-header"><span class="icon">⚡</span> Macros</div>
+    <div class="section-body">
+      <div class="btn-grid macros" id="macros-grid"></div>
+    </div>
+  </div>
+
+  <!-- ── Mood ── -->
+  <div class="section">
+    <div class="section-header"><span class="icon">🌙</span> Mood</div>
+    <div class="section-body">
+      <div class="btn-grid" id="mood-grid"></div>
+    </div>
+  </div>
+
+  <!-- ── NPCs ── -->
+  <div class="section">
+    <div class="section-header"><span class="icon">👤</span> NPCs</div>
+    <div class="section-body">
+      <div class="btn-grid wide" id="npc-grid"></div>
+    </div>
+  </div>
+
+  <!-- ── Lore Feed ── -->
+  <div class="section">
+    <div class="section-header"><span class="icon">📜</span> Lore Feed</div>
+    <div class="section-body">
+      <div class="btn-grid">
+        <div class="btn danger" onclick="clearLore()">
+          <span class="btn-icon">🗑</span>
+          <span class="btn-label">Clear Feed</span>
+        </div>
+      </div>
+      <div class="lore-input-row">
+        <input class="lore-input" id="lore-text" type="text" placeholder="Push lore text..." enterkeyhint="send">
+        <button class="btn-send" onclick="pushLore()">Push</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── OBS Scenes ── -->
+  <div class="section">
+    <div class="section-header"><span class="icon">🎬</span> OBS Scenes</div>
+    <div class="section-body">
+      <div class="btn-grid wide" id="scene-grid"></div>
+    </div>
+  </div>
+
+  <!-- ── Kenku FM ── -->
+  <div class="section">
+    <div class="section-header"><span class="icon">🎵</span> Kenku FM</div>
+    <div class="section-body">
+      <div class="btn-grid" id="kenku-grid"></div>
+      <div class="volume-row">
+        <label>Volume</label>
+        <input class="volume-slider" type="range" min="0" max="100" value="80"
+          oninput="kenkuVolume(this.value)">
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Foundry VTT ── -->
+  <div class="section">
+    <div class="section-header"><span class="icon">🎲</span> Foundry VTT</div>
+    <div class="section-body">
+      <div class="btn-grid wide" id="foundry-grid"></div>
+      <div class="lore-input-row" style="margin-top:8px;">
+        <input class="lore-input" id="foundry-chat" type="text" placeholder="Send GM chat message..." enterkeyhint="send">
+        <button class="btn-send" onclick="foundrySendChat()">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Connection Settings ── -->
+  <div class="section">
+    <div class="section-header"><span class="icon">⚙</span> Connections</div>
+    <div class="section-body">
+      <input type="checkbox" class="config-toggle" id="config-toggle">
+      <label class="config-trigger" for="config-toggle">Show / Hide Settings</label>
+      <div class="config-panel">
+        <div class="config-row">
+          <label>Overlay</label>
+          <input class="config-input" id="cfg-overlay" value="http://localhost:3001">
+        </div>
+        <div class="config-row">
+          <label>OBS WS</label>
+          <input class="config-input" id="cfg-obs" value="ws://localhost:4455">
+        </div>
+        <div class="config-row">
+          <label>OBS Pass</label>
+          <input class="config-input" id="cfg-obs-pass" type="password" placeholder="(none)">
+        </div>
+        <div class="config-row">
+          <label>Kenku FM</label>
+          <input class="config-input" id="cfg-kenku" value="http://localhost:3333">
+        </div>
+        <div class="config-row">
+          <label>Foundry Relay</label>
+          <input class="config-input" id="cfg-foundry-relay" value="https://foundryvtt-rest-api-relay.fly.dev">
+        </div>
+        <div class="config-row">
+          <label>Foundry Key</label>
+          <input class="config-input" id="cfg-foundry-key" type="password" placeholder="API key from relay">
+        </div>
+        <div class="config-row">
+          <label>Client ID</label>
+          <input class="config-input" id="cfg-foundry-client" placeholder="From /clients endpoint">
+        </div>
+        <div style="padding-top:8px;">
+          <button class="btn-send" onclick="reconnectAll()" style="width:100%;">Reconnect All</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// DM REMOTE — Mission Control for Keys to Perfection
+// Talks to: KTP Overlay (HTTP), OBS (WebSocket v5), Kenku FM (HTTP)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Configuration ──────────────────────────────────────────────────────────
+
+const CONFIG = {
+  moods: [
+    { id: 'neutral',    label: 'Neutral',    icon: '◉' },
+    { id: 'tense',      label: 'Tense',      icon: '⚡' },
+    { id: 'mysterious', label: 'Mysterious', icon: '🌀' },
+    { id: 'triumphant', label: 'Triumphant', icon: '👑' },
+    { id: 'somber',     label: 'Somber',     icon: '🕯' },
+    { id: 'eerie',      label: 'Eerie',      icon: '👁' },
+  ],
+  npcs: [
+    { name: 'Bastien',  icon: '🗡' },
+    { name: 'Pyraxis',  icon: '🔥' },
+    { name: 'Remus',    icon: '🐺' },
+    // Add more NPCs here
+  ],
+  scenes: [
+    // These will be auto-populated from OBS if connected,
+    // but you can pre-define them as fallbacks:
+    { name: 'Main',     icon: '🎭' },
+    { name: 'Combat',   icon: '⚔' },
+    { name: 'Map',      icon: '🗺' },
+    { name: 'Break',    icon: '☕' },
+  ],
+  macros: [
+    {
+      id: 'combat-start', label: 'Combat Start', icon: '⚔',
+      actions: [
+        { target: 'overlay', method: 'PUT', path: '/api/state', body: { mood: 'tense' } },
+        // { target: 'obs', request: 'SetCurrentProgramScene', data: { sceneName: 'Combat' } },
+        // { target: 'kenku', method: 'PUT', path: '/v1/playlist/play', body: { id: 'YOUR_COMBAT_PLAYLIST_ID' } },
+      ]
+    },
+    {
+      id: 'combat-end', label: 'Combat End', icon: '🕊',
+      actions: [
+        { target: 'overlay', method: 'PUT', path: '/api/state', body: { mood: 'neutral' } },
+        { target: 'overlay', method: 'PUT', path: '/api/state', body: { npcVisible: false } },
+      ]
+    },
+    {
+      id: 'dramatic-reveal', label: 'Dramatic Reveal', icon: '✨',
+      actions: [
+        { target: 'overlay', method: 'PUT', path: '/api/state', body: { mood: 'mysterious' } },
+      ]
+    },
+    {
+      id: 'session-reset', label: 'Session Reset', icon: '🔄',
+      actions: [
+        { target: 'overlay', method: 'PUT', path: '/api/state', body: { mood: 'neutral', npcVisible: false } },
+        { target: 'overlay', method: 'POST', path: '/api/lore/clear' },
+      ]
+    },
+  ],
+  kenkuButtons: [
+    { action: 'play-pause', label: 'Play/Pause', icon: '⏯' },
+    { action: 'next',       label: 'Next',       icon: '⏭' },
+    { action: 'previous',   label: 'Prev',       icon: '⏮' },
+    { action: 'shuffle',    label: 'Shuffle',    icon: '🔀' },
+    { action: 'repeat',     label: 'Repeat',     icon: '🔁' },
+    { action: 'stop',       label: 'Stop',       icon: '⏹' },
+  ],
+  foundryButtons: [
+    // Macro buttons — fill in macro names or IDs from your world
+    // The 'type' field determines what the button does:
+    //   'macro'  → executes a Foundry macro by name
+    //   'roll'   → performs a dice roll
+    //   'scene'  → activates a Foundry scene
+    //   'chat'   → sends a chat message
+    { type: 'macro', name: 'Initiative',  icon: '⚔',  label: 'Roll Initiative' },
+    { type: 'macro', name: 'Short Rest',  icon: '🛏',  label: 'Short Rest' },
+    { type: 'macro', name: 'Long Rest',   icon: '🌙', label: 'Long Rest' },
+    { type: 'roll',  formula: '1d20',     icon: '🎲', label: 'Quick d20' },
+    { type: 'chat',  message: '/desc The ground trembles beneath your feet...', icon: '📣', label: 'Narrate' },
+    // Add your own macros here — match names to what's in your Foundry macro bar
+  ],
+};
+
+// ── State ──────────────────────────────────────────────────────────────────
+
+let overlayState = {};
+let obsWs = null;
+let obsConnected = false;
+let obsReqId = 1;
+let currentMood = 'neutral';
+let currentNpc = null;
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+
+function toast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (isError ? ' error' : '');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => el.className = 'toast', 1500);
+}
+
+// ── Overlay API ────────────────────────────────────────────────────────────
+
+function getOverlayUrl() {
+  return document.getElementById('cfg-overlay').value || 'http://localhost:3001';
+}
+
+async function overlayFetch(method, path, body) {
+  const url = `${getOverlayUrl()}${path}`;
+  try {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body && method !== 'GET') opts.body = JSON.stringify(body);
+    const res = await fetch(url, opts);
+    if (!res.ok) throw new Error(`${res.status}`);
+    document.getElementById('status-overlay').classList.add('connected');
+    return await res.json();
+  } catch (e) {
+    document.getElementById('status-overlay').classList.remove('connected');
+    throw e;
+  }
+}
+
+async function setMood(mood) {
+  try {
+    await overlayFetch('PUT', '/api/state', { mood });
+    currentMood = mood;
+    updateMoodButtons();
+    toast(`Mood → ${mood}`);
+  } catch (e) { toast(`Mood failed: ${e.message}`, true); }
+}
+
+async function showNpc(name) {
+  try {
+    await overlayFetch('PUT', '/api/state', { npcName: name, npcVisible: true });
+    currentNpc = name;
+    updateNpcButtons();
+    toast(`NPC → ${name}`);
+  } catch (e) { toast(`NPC failed: ${e.message}`, true); }
+}
+
+async function hideNpc() {
+  try {
+    await overlayFetch('PUT', '/api/state', { npcVisible: false });
+    currentNpc = null;
+    updateNpcButtons();
+    toast('NPC hidden');
+  } catch (e) { toast(`Hide NPC failed: ${e.message}`, true); }
+}
+
+async function pushLore() {
+  const input = document.getElementById('lore-text');
+  const text = input.value.trim();
+  if (!text) return;
+  try {
+    await overlayFetch('POST', '/api/lore/push', { text });
+    input.value = '';
+    toast('Lore pushed');
+  } catch (e) { toast(`Lore failed: ${e.message}`, true); }
+}
+
+async function clearLore() {
+  try {
+    await overlayFetch('POST', '/api/lore/clear');
+    toast('Lore cleared');
+  } catch (e) { toast(`Clear failed: ${e.message}`, true); }
+}
+
+// Enter key on lore input
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('lore-text').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); pushLore(); }
+  });
+});
+
+// ── OBS WebSocket v5 ───────────────────────────────────────────────────────
+
+function getObsUrl()  { return document.getElementById('cfg-obs').value || 'ws://localhost:4455'; }
+function getObsPass() { return document.getElementById('cfg-obs-pass').value || ''; }
+
+function connectObs() {
+  if (obsWs) { try { obsWs.close(); } catch {} }
+  try {
+    obsWs = new WebSocket(getObsUrl());
+  } catch (e) {
+    document.getElementById('status-obs').classList.remove('connected');
+    return;
+  }
+
+  obsWs.onopen = () => { /* Wait for Hello message */ };
+
+  obsWs.onmessage = (evt) => {
+    let msg;
+    try { msg = JSON.parse(evt.data); } catch { return; }
+
+    // op 0 = Hello
+    if (msg.op === 0) {
+      const auth = msg.d.authentication;
+      if (auth && getObsPass()) {
+        // Authenticate
+        generateObsAuth(getObsPass(), auth.salt, auth.challenge).then(authStr => {
+          obsWs.send(JSON.stringify({
+            op: 1,
+            d: { rpcVersion: 1, authentication: authStr }
+          }));
+        });
+      } else {
+        // No auth needed
+        obsWs.send(JSON.stringify({ op: 1, d: { rpcVersion: 1 } }));
+      }
+    }
+
+    // op 2 = Identified (connected successfully)
+    if (msg.op === 2) {
+      obsConnected = true;
+      document.getElementById('status-obs').classList.add('connected');
+      toast('OBS connected');
+    }
+
+    // op 7 = RequestResponse
+    if (msg.op === 7) {
+      // Handle responses if needed
+    }
+  };
+
+  obsWs.onclose = () => {
+    obsConnected = false;
+    document.getElementById('status-obs').classList.remove('connected');
+  };
+
+  obsWs.onerror = () => {
+    document.getElementById('status-obs').classList.remove('connected');
+  };
+}
+
+async function generateObsAuth(password, salt, challenge) {
+  const enc = new TextEncoder();
+  const secret1 = await crypto.subtle.digest('SHA-256', enc.encode(password + salt));
+  const b64secret = btoa(String.fromCharCode(...new Uint8Array(secret1)));
+  const secret2 = await crypto.subtle.digest('SHA-256', enc.encode(b64secret + challenge));
+  return btoa(String.fromCharCode(...new Uint8Array(secret2)));
+}
+
+function obsSend(requestType, requestData = {}) {
+  if (!obsWs || obsWs.readyState !== WebSocket.OPEN) {
+    toast('OBS not connected', true);
+    return;
+  }
+  const id = String(obsReqId++);
+  obsWs.send(JSON.stringify({
+    op: 6,
+    d: { requestType, requestId: id, requestData }
+  }));
+}
+
+function setScene(sceneName) {
+  obsSend('SetCurrentProgramScene', { sceneName });
+  toast(`Scene → ${sceneName}`);
+}
+
+// ── Kenku FM ───────────────────────────────────────────────────────────────
+
+function getKenkuUrl() { return document.getElementById('cfg-kenku').value || 'http://localhost:3333'; }
+
+async function kenkuFetch(method, path, body) {
+  const url = `${getKenkuUrl()}${path}`;
+  try {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body && method !== 'GET') opts.body = JSON.stringify(body);
+    const res = await fetch(url, opts);
+    document.getElementById('status-kenku').classList.add('connected');
+    return res;
+  } catch (e) {
+    document.getElementById('status-kenku').classList.remove('connected');
+    throw e;
+  }
+}
+
+async function kenkuAction(action) {
+  try {
+    switch (action) {
+      case 'play-pause':
+        await kenkuFetch('PUT', '/v1/playlist/playback/play');
+        toast('Kenku: play/pause');
+        break;
+      case 'next':
+        await kenkuFetch('PUT', '/v1/playlist/playback/next');
+        toast('Kenku: next');
+        break;
+      case 'previous':
+        await kenkuFetch('PUT', '/v1/playlist/playback/previous');
+        toast('Kenku: previous');
+        break;
+      case 'shuffle':
+        await kenkuFetch('PUT', '/v1/playlist/playback/shuffle');
+        toast('Kenku: shuffle');
+        break;
+      case 'repeat':
+        await kenkuFetch('PUT', '/v1/playlist/playback/repeat');
+        toast('Kenku: repeat');
+        break;
+      case 'stop':
+        await kenkuFetch('PUT', '/v1/playlist/playback/stop');
+        toast('Kenku: stop');
+        break;
+      default:
+        toast(`Unknown kenku action: ${action}`, true);
+    }
+  } catch (e) {
+    toast(`Kenku: ${e.message}`, true);
+  }
+}
+
+let volumeDebounce;
+function kenkuVolume(val) {
+  clearTimeout(volumeDebounce);
+  volumeDebounce = setTimeout(async () => {
+    try {
+      await kenkuFetch('PUT', '/v1/playlist/playback/volume', { volume: parseInt(val) / 100 });
+    } catch (e) { /* silent */ }
+  }, 100);
+}
+
+// ── Foundry VTT (via REST API Relay) ───────────────────────────────────────
+
+function getFoundryRelay()  { return document.getElementById('cfg-foundry-relay').value || ''; }
+function getFoundryKey()    { return document.getElementById('cfg-foundry-key').value || ''; }
+function getFoundryClient() { return document.getElementById('cfg-foundry-client').value || ''; }
+
+async function foundryFetch(method, path, body) {
+  const relay = getFoundryRelay();
+  const apiKey = getFoundryKey();
+  const clientId = getFoundryClient();
+  if (!relay || !apiKey) throw new Error('Foundry not configured');
+
+  const url = `${relay}${path}`;
+  const opts = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+    },
+  };
+  // Add clientId to body for non-GET requests
+  if (body && method !== 'GET') {
+    opts.body = JSON.stringify({ clientId, ...body });
+  }
+  // Add clientId as query param for GET
+  const finalUrl = method === 'GET' && clientId ? `${url}?clientId=${clientId}` : url;
+
+  try {
+    const res = await fetch(finalUrl, opts);
+    if (!res.ok) throw new Error(`${res.status}`);
+    document.getElementById('status-foundry').classList.add('connected');
+    return await res.json();
+  } catch (e) {
+    document.getElementById('status-foundry').classList.remove('connected');
+    throw e;
+  }
+}
+
+async function foundryExecuteMacro(macroName) {
+  try {
+    await foundryFetch('POST', '/macro', { name: macroName });
+    toast(`Foundry: ${macroName}`);
+  } catch (e) { toast(`Foundry macro failed: ${e.message}`, true); }
+}
+
+async function foundryRoll(formula) {
+  try {
+    const result = await foundryFetch('POST', '/roll', { formula });
+    const total = result?.total ?? result?.result?.total ?? '?';
+    toast(`🎲 ${formula} → ${total}`);
+  } catch (e) { toast(`Foundry roll failed: ${e.message}`, true); }
+}
+
+async function foundrySendChat() {
+  const input = document.getElementById('foundry-chat');
+  const message = input.value.trim();
+  if (!message) return;
+  try {
+    await foundryFetch('POST', '/create', {
+      type: 'ChatMessage',
+      data: { content: message, type: 1 }
+    });
+    input.value = '';
+    toast('Foundry: message sent');
+  } catch (e) { toast(`Foundry chat failed: ${e.message}`, true); }
+}
+
+async function foundryActivateScene(sceneName) {
+  try {
+    // Search for scene by name, then activate it
+    const searchResult = await foundryFetch('POST', '/search', {
+      type: 'Scene',
+      query: sceneName,
+    });
+    if (searchResult?.results?.length > 0) {
+      const sceneId = searchResult.results[0]._id;
+      await foundryFetch('POST', '/update', {
+        type: 'Scene',
+        id: sceneId,
+        data: { active: true, navigation: true },
+      });
+      toast(`Foundry scene: ${sceneName}`);
+    } else {
+      toast(`Scene "${sceneName}" not found`, true);
+    }
+  } catch (e) { toast(`Foundry scene failed: ${e.message}`, true); }
+}
+
+function foundryButtonAction(btn) {
+  switch (btn.type) {
+    case 'macro': foundryExecuteMacro(btn.name); break;
+    case 'roll':  foundryRoll(btn.formula); break;
+    case 'scene': foundryActivateScene(btn.name); break;
+    case 'chat':  foundryFetch('POST', '/create', {
+      type: 'ChatMessage',
+      data: { content: btn.message, type: 1 }
+    }).then(() => toast('Foundry: sent')).catch(e => toast(`Failed: ${e.message}`, true)); break;
+  }
+}
+
+// Enter key on foundry chat input
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('foundry-chat')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); foundrySendChat(); }
+  });
+});
+
+// ── Macro Execution ────────────────────────────────────────────────────────
+
+async function executeMacro(macro) {
+  toast(`▶ ${macro.label}...`);
+  const promises = macro.actions.map(async (action) => {
+    switch (action.target) {
+      case 'overlay':
+        return overlayFetch(action.method, action.path, action.body);
+      case 'obs':
+        obsSend(action.request, action.data);
+        return Promise.resolve();
+      case 'kenku':
+        return kenkuFetch(action.method, action.path, action.body);
+      case 'foundry':
+        return foundryFetch(action.method, action.path, action.body);
+    }
+  });
+
+  try {
+    await Promise.allSettled(promises);
+    // Update local state from overlay actions
+    for (const action of macro.actions) {
+      if (action.target === 'overlay' && action.body) {
+        if (action.body.mood) { currentMood = action.body.mood; updateMoodButtons(); }
+        if (action.body.npcVisible === false) { currentNpc = null; updateNpcButtons(); }
+        if (action.body.npcName && action.body.npcVisible) { currentNpc = action.body.npcName; updateNpcButtons(); }
+      }
+    }
+    toast(`✓ ${macro.label}`);
+  } catch (e) {
+    toast(`✗ ${macro.label}`, true);
+  }
+}
+
+// ── UI Rendering ───────────────────────────────────────────────────────────
+
+function renderMoods() {
+  const grid = document.getElementById('mood-grid');
+  grid.innerHTML = CONFIG.moods.map(m => `
+    <div class="btn mood-${m.id} ${currentMood === m.id ? 'active' : ''}"
+         data-mood="${m.id}" onclick="setMood('${m.id}')">
+      <span class="btn-icon">${m.icon}</span>
+      <span class="btn-label">${m.label}</span>
+    </div>
+  `).join('');
+}
+
+function updateMoodButtons() {
+  document.querySelectorAll('[data-mood]').forEach(el => {
+    el.classList.toggle('active', el.dataset.mood === currentMood);
+  });
+}
+
+function renderNpcs() {
+  const grid = document.getElementById('npc-grid');
+  grid.innerHTML = CONFIG.npcs.map(n => `
+    <div class="btn ${currentNpc === n.name ? 'active' : ''}"
+         data-npc="${n.name}" onclick="showNpc('${n.name}')">
+      <span class="btn-icon">${n.icon}</span>
+      <span class="btn-label">${n.name}</span>
+    </div>
+  `).join('') + `
+    <div class="btn danger" onclick="hideNpc()">
+      <span class="btn-icon">✕</span>
+      <span class="btn-label">Hide NPC</span>
+    </div>
+  `;
+}
+
+function updateNpcButtons() {
+  document.querySelectorAll('[data-npc]').forEach(el => {
+    el.classList.toggle('active', el.dataset.npc === currentNpc);
+  });
+}
+
+function renderScenes() {
+  const grid = document.getElementById('scene-grid');
+  grid.innerHTML = CONFIG.scenes.map(s => `
+    <div class="btn" onclick="setScene('${s.name}')">
+      <span class="btn-icon">${s.icon}</span>
+      <span class="btn-label">${s.name}</span>
+    </div>
+  `).join('');
+}
+
+function renderKenku() {
+  const grid = document.getElementById('kenku-grid');
+  grid.innerHTML = CONFIG.kenkuButtons.map(k => `
+    <div class="btn" onclick="kenkuAction('${k.action}')">
+      <span class="btn-icon">${k.icon}</span>
+      <span class="btn-label">${k.label}</span>
+    </div>
+  `).join('');
+}
+
+function renderMacros() {
+  const grid = document.getElementById('macros-grid');
+  grid.innerHTML = CONFIG.macros.map(m => `
+    <div class="btn macro" onclick="executeMacro(CONFIG.macros.find(x=>x.id==='${m.id}'))">
+      <span class="btn-icon">${m.icon}</span>
+      <span>${m.label}</span>
+      <span class="btn-label">${m.actions.length} action${m.actions.length > 1 ? 's' : ''}</span>
+    </div>
+  `).join('');
+}
+
+function renderFoundry() {
+  const grid = document.getElementById('foundry-grid');
+  grid.innerHTML = CONFIG.foundryButtons.map((b, i) => `
+    <div class="btn" onclick="foundryButtonAction(CONFIG.foundryButtons[${i}])">
+      <span class="btn-icon">${b.icon}</span>
+      <span class="btn-label">${b.label}</span>
+    </div>
+  `).join('');
+}
+
+// ── Connectivity Check ─────────────────────────────────────────────────────
+
+async function checkOverlay() {
+  try {
+    const state = await overlayFetch('GET', '/api/state');
+    overlayState = state;
+    if (state.mood) { currentMood = state.mood; updateMoodButtons(); }
+    if (state.npcVisible && state.npcName) { currentNpc = state.npcName; }
+    else { currentNpc = null; }
+    updateNpcButtons();
+  } catch {}
+}
+
+async function checkKenku() {
+  try {
+    await kenkuFetch('GET', '/v1/playlist');
+    document.getElementById('status-kenku').classList.add('connected');
+  } catch {
+    document.getElementById('status-kenku').classList.remove('connected');
+  }
+}
+
+async function checkFoundry() {
+  const relay = getFoundryRelay();
+  const apiKey = getFoundryKey();
+  if (!relay || !apiKey) return;
+  try {
+    await foundryFetch('GET', '/clients');
+    document.getElementById('status-foundry').classList.add('connected');
+  } catch {
+    document.getElementById('status-foundry').classList.remove('connected');
+  }
+}
+
+function reconnectAll() {
+  checkOverlay();
+  connectObs();
+  checkKenku();
+  checkFoundry();
+  toast('Reconnecting...');
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+
+function init() {
+  renderMoods();
+  renderNpcs();
+  renderScenes();
+  renderKenku();
+  renderMacros();
+  renderFoundry();
+
+  // Connect to services
+  checkOverlay();
+  connectObs();
+  checkKenku();
+  checkFoundry();
+
+  // Periodic health check
+  setInterval(() => {
+    checkOverlay();
+    checkKenku();
+    checkFoundry();
+    if (!obsConnected) connectObs();
+  }, 10000);
+}
+
+init();
+</script>
+</body>
+</html>

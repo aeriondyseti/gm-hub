@@ -1,0 +1,12 @@
+{
+  "sceneVisible": false,
+  "sceneLocation": "Private Meeting Room",
+  "sceneSubtitle": "A quiet place for quiet conversations.",
+  "npcVisible": false,
+  "npcName": "Amara",
+  "npcTitle": "Empress-in-waiting",
+  "mood": "neutral",
+  "loreFeed": [],
+  "loreNextId": 5,
+  "session": "14"
+}
