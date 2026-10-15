@@ -4,7 +4,7 @@ import { join } from "path";
 const DATA_PATH = join(import.meta.dir, "data", "state.json");
 const PRESETS_PATH = join(import.meta.dir, "data", "presets.json");
 const CLIENTS_DIR = join(import.meta.dir, "clients");
-const PORT = 3001;
+const PORT = Number(process.env.PORT) || 3001;
 
 // Ensure data dir exists
 const dataDir = join(import.meta.dir, "data");
@@ -211,14 +211,12 @@ const server = Bun.serve({
     }
 
     // Static routes
-    if (url.pathname === "/" || url.pathname === "/control") {
-      return serveStatic("control.html");
+    // /control and /remote are the old GM pages, now merged into /gm.
+    if (["/", "/gm", "/control", "/remote"].includes(url.pathname)) {
+      return serveStatic("gm.html");
     }
     if (url.pathname === "/overlay") {
       return serveStatic("overlay.html");
-    }
-    if (url.pathname === "/remote") {
-      return serveStatic("remote.html");
     }
 
     return serveStatic(url.pathname.slice(1));
@@ -302,5 +300,4 @@ const server = Bun.serve({
 
 console.log(`Keys to Perfection Hub running on http://localhost:${PORT}`);
 console.log(`  Overlay: http://localhost:${PORT}/overlay`);
-console.log(`  Control: http://localhost:${PORT}/control`);
-console.log(`  Remote:  http://localhost:${PORT}/remote`);
+console.log(`  GM:      http://localhost:${PORT}/gm`);

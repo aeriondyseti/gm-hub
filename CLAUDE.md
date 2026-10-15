@@ -5,11 +5,11 @@ The session-state hub for **Keys to Perfection**. Bun server on port
 WebSocket, and acts as the message bus between named **peers**
 (Foundry bridge, hexploration, future tools).
 
-The hub is also the host for a few browser **clients**: the OBS
-overlay, plus GM-facing control and remote pages. The overlay is the
-hub's canonical *projection* — its read-only render targeting OBS. The
-control and remote are the GM's *input* surfaces and will eventually
-move to a sibling `ktp-console/` repo (see backlog in
+The hub is also the host for two browser **clients**: the OBS overlay
+and the GM panel. The overlay is the hub's canonical *projection* — its
+read-only render targeting OBS. The GM panel is the GM's *input* surface
+(it replaced the old separate control and remote pages) and may
+eventually move to a sibling `ktp-console/` repo (see backlog in
 `../hexploration/ROADMAP.md`).
 
 ## Taxonomy
@@ -18,7 +18,7 @@ move to a sibling `ktp-console/` repo (see backlog in
 |----------|-----------------------------------------------------|---------------------------------------|
 | **Hub**  | This server. Owns state, runs the bus + REST + WS.  | `ktp-hub/` (this repo)                |
 | **Peers**| WS-connected tools exchanging commands and events.  | `ktp-foundry-bridge`, `hexploration`  |
-| **Clients** | Browser pages that consume the hub's HTTP+WS.    | `overlay.html`, `control.html`, `remote.html` |
+| **Clients** | Browser pages that consume the hub's HTTP+WS.    | `overlay.html`, `gm.html` |
 
 Peers are symmetric on the wire — any peer can send commands or events
 at any time. The hub routes between them. Clients are HTTP/WS consumers
@@ -46,8 +46,8 @@ ktp-hub/
 ├── package.json           — bun runtime only, no deps
 ├── clients/               — browser pages served by the hub
 │   ├── overlay.html       — transparent OBS browser source projection
-│   ├── control.html       — GM control surface (planned move → ktp-console/)
-│   └── remote.html        — touch-friendly remote (planned move → ktp-console/)
+│   └── gm.html            — GM panel: narrow side-strip for a big-screen TV
+│                            (preview, macros, mood, scene, NPC, lore, Kenku, Foundry)
 └── data/
     ├── state.json         — runtime session state (scene/NPC/mood/lore)
     └── presets.json       — NPC and location library for the campaign
@@ -59,12 +59,12 @@ ktp-hub/
 bun run server.js          # starts on :3001
 # or
 npm start                  # same thing (package.json script wraps it)
+PORT=3002 bun run server.js  # alternate port, e.g. to test a worktree
 ```
 
 Then open:
 - http://localhost:3001/overlay  (set as OBS browser source)
-- http://localhost:3001/control
-- http://localhost:3001/remote
+- http://localhost:3001/gm  (`/`, `/control` and `/remote` serve it too)
 
 ## Protocol (v1.4+)
 

@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KtP GM Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&display=swap" rel="stylesheet">
+<style>
+  /* ══ GM Panel — merged DM Control + DM Remote ══
+     Built as a tall, narrow side strip (roughly 320–720px wide) docked on a
+     big-screen TV. Everything is sized in rem off --ui-scale, which the
+     A−/A+ buttons adjust so the panel can be tuned for viewing distance. */
+  :root {
+    --ui-scale: 1;
+    --bg: #0f0b06;
+    --bg-2: #1a1209;
+    --panel: #1f180f;
+    --card: #2a2318;
+    --card-hi: #352b1d;
+    --line: #6b5a3e;
+    --line-soft: #3d3222;
+    --bronze: #8b7441;
+    --gold: #c4a265;
+    --gold-2: #a8924f;
+    --text: #e8d5a3;
+    --text-2: #d4c4a0;
+    --muted: #a08c6a;
+    --danger: #e0704a;
+    --ok: #7fbf6a;
+    --off: #8b3a2a;
+    --radius: 6px;
+    --tap: 2.9rem;
+    --display: 'Cinzel Decorative', serif;
+    --label: 'Cinzel', serif;
+    --body: 'Cormorant Garamond', serif;
+  }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { font-size: calc(16px * var(--ui-scale)); }
+  html, body { min-height: 100%; background: var(--bg); }
+  body {
+    background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg) 100%) fixed;
+    color: var(--text); font-family: var(--body); font-size: 1.125rem; font-weight: 500;
+    overflow-x: hidden; touch-action: manipulation;
+  }
+  button, input, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  /* ── Header ── */
+  .header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+    padding: .55rem .75rem;
+    background: linear-gradient(180deg, #1c140a 0%, #140f08 100%);
+    border-bottom: 2px solid var(--line);
+  }
+  .title {
+    font-family: var(--display); font-size: 1rem; color: var(--gold);
+    letter-spacing: .12em; white-space: nowrap; margin-right: auto;
+  }
+  .session { display: flex; align-items: center; gap: .35rem; }
+  .session label { font-family: var(--label); font-size: .7rem; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; }
+  .session input[type="text"] { width: 3.6rem; text-align: center; padding: .3rem .25rem; font-size: 1.05rem; }
+  .status { display: flex; gap: .3rem; }
+  .pill {
+    font-family: var(--label); font-size: .62rem; font-weight: 600; letter-spacing: .1em;
+    padding: .2rem .4rem; border-radius: 99px; border: 1px solid var(--off); color: #c98a78;
+    display: flex; align-items: center; gap: .3rem;
+  }
+  .pill::before { content: ''; width: .45rem; height: .45rem; border-radius: 50%; background: var(--off); }
+  .pill.on { border-color: #4e7a42; color: var(--ok); }
+  .pill.on::before { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+  .zoom { display: flex; gap: .2rem; }
+  .zoom button {
+    width: 2rem; height: 2rem; border-radius: 4px; background: transparent;
+    border: 1px solid var(--line); color: var(--muted); font-family: var(--label); font-size: .75rem;
+  }
+  .zoom button:active { background: var(--card); }
+
+  /* ── Column ── */
+  main { display: flex; flex-direction: column; gap: .6rem; padding: .6rem .6rem 4.5rem; }
+
+  /* ── Collapsible sections ── */
+  .section { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+  .section > summary {
+    list-style: none; cursor: pointer; user-select: none;
+    display: flex; align-items: center; gap: .5rem; min-height: 2.6rem; padding: .4rem .8rem;
+    font-family: var(--label); font-size: .82rem; font-weight: 700; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--gold-2);
+  }
+  .section > summary::-webkit-details-marker { display: none; }
+  .section > summary::after {
+    content: ''; margin-left: auto; width: .5rem; height: .5rem;
+    border-right: 2px solid var(--line); border-bottom: 2px solid var(--line);
+    transform: rotate(-45deg); transition: transform .15s ease;
+  }
+  .section[open] > summary::after { transform: rotate(45deg); }
+  .section[open] > summary { border-bottom: 1px solid var(--line-soft); }
+  .summary-note {
+    font-family: var(--body); font-size: .95rem; font-weight: 500; font-style: italic;
+    letter-spacing: 0; text-transform: none; color: var(--muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+  }
+  .body { padding: .7rem; display: flex; flex-direction: column; gap: .6rem; }
+
+  /* ── Inputs ── */
+  input[type="text"], textarea {
+    width: 100%; padding: .55rem .7rem; background: var(--card); border: 1px solid #7a6548;
+    border-radius: 4px; color: var(--text); font-size: 1.1rem; outline: none;
+  }
+  input[type="text"]:focus, textarea:focus { border-color: var(--gold); }
+  input::placeholder, textarea::placeholder { color: #8c7b68; font-style: italic; }
+  textarea { resize: vertical; min-height: 3.2rem; line-height: 1.35; }
+  .hint-input { font-size: .95rem !important; font-style: italic; color: var(--muted) !important; }
+
+  /* ── Buttons ── */
+  .btn {
+    min-height: var(--tap); padding: .45rem .8rem; border-radius: 4px;
+    background: transparent; border: 1px solid var(--bronze); color: var(--gold-2);
+    font-family: var(--label); font-size: .82rem; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; transition: background .15s ease, color .15s ease;
+    display: inline-flex; align-items: center; justify-content: center; gap: .4rem; text-align: center;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn:hover { background: rgba(139, 116, 65, .15); }
+  .btn.primary { border-color: var(--gold); color: var(--gold); }
+  .btn.solid { background: var(--bronze); color: var(--bg-2); }
+  .btn.danger { border-color: var(--danger); color: var(--danger); }
+  .btn.danger:hover { background: rgba(224, 112, 74, .12); }
+  .btn[disabled] { border-color: var(--line); color: #7a6a55; cursor: default; }
+  .btn.small { min-height: 2.2rem; padding: .3rem .6rem; font-size: .7rem; }
+  .row { display: flex; gap: .5rem; }
+  .row > * { flex: 1; }
+  .row > .shrink { flex: 0 0 auto; }
+  .grid { display: grid; gap: .45rem; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); }
+  .grid.two { grid-template-columns: 1fr 1fr; }
+
+  /* ── Preview ── */
+  .preview {
+    position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden;
+    background: radial-gradient(ellipse at 50% 40%, #2a2216 0%, #0d0b08 75%);
+    border: 1px solid var(--line-soft); border-radius: 4px;
+  }
+  .preview iframe {
+    position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; border: 0;
+    transform-origin: 0 0; pointer-events: none; background: transparent;
+  }
+  .preview video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none; }
+  .preview.camera video { display: block; }
+  .preview.camera iframe { display: none; }
+
+  /* ── Macros ── */
+  .macro { flex-direction: column; gap: .1rem; min-height: 3.6rem; border-color: var(--gold-2); color: var(--text); }
+  .macro .glyph { font-size: 1.15rem; line-height: 1; color: var(--gold); }
+
+  /* ── Mood ── */
+  .mood-grid { display: grid; gap: .45rem; grid-template-columns: repeat(auto-fill, minmax(7.2rem, 1fr)); }
+  .mood {
+    min-height: var(--tap); border-radius: 4px; background: transparent;
+    border: 1px solid var(--mc); border-left-width: .35rem; color: var(--mc);
+    font-family: var(--label); font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  }
+  .mood.active { background: var(--mc); color: var(--bg-2); box-shadow: 0 0 14px color-mix(in srgb, var(--mc) 45%, transparent); }
+
+  /* ── On-screen strip ── */
+  .live {
+    display: flex; align-items: center; gap: .6rem; padding: .45rem .5rem .45rem .7rem;
+    border: 1px solid var(--gold); border-radius: 4px; background: rgba(196, 162, 101, .1);
+  }
+  .live-text { flex: 1; min-width: 0; line-height: 1.2; }
+  .live-tag { font-family: var(--label); font-size: .62rem; letter-spacing: .14em; color: var(--gold); text-transform: uppercase; }
+  .live-name { font-family: var(--label); font-size: .95rem; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+  .live-sub { font-style: italic; color: var(--muted); font-size: 1rem; }
+  .live.off { border-color: var(--line-soft); background: transparent; }
+  .live.off .live-tag { color: var(--muted); }
+
+  /* ── Presets ── */
+  .presets { display: flex; flex-direction: column; gap: .35rem; }
+  .preset { display: flex; gap: .35rem; }
+  .preset-btn {
+    flex: 1; min-height: var(--tap); padding: .45rem .75rem; text-align: left; line-height: 1.2;
+    background: rgba(26, 18, 9, .45); border: 1px solid var(--line); border-radius: 4px;
+  }
+  .preset-btn:hover { border-color: var(--muted); }
+  .preset-btn.shown { background: rgba(196, 162, 101, .16); border-color: var(--gold); box-shadow: inset .3rem 0 0 var(--gold); }
+  .preset-name { display: block; font-family: var(--label); font-size: .9rem; font-weight: 600; letter-spacing: .04em; color: var(--text); }
+  .preset-sub { display: block; font-style: italic; color: var(--muted); font-size: 1rem; }
+  .preset-vtt { font-family: var(--label); font-size: .6rem; letter-spacing: .1em; color: var(--gold-2); margin-left: .35rem; vertical-align: .1em; }
+  .preset-rm {
+    display: none; width: var(--tap); flex: 0 0 auto; border-radius: 4px;
+    background: transparent; border: 1px solid var(--danger); color: var(--danger); font-size: 1.3rem;
+  }
+  .section.editing .preset-rm { display: block; }
+  .empty { font-style: italic; color: var(--muted); text-align: center; padding: .4rem; font-size: 1rem; }
+
+  /* ── Drawers (custom / edit) ── */
+  .drawer { border-top: 1px dashed var(--line-soft); padding-top: .4rem; }
+  .drawer > summary {
+    list-style: none; cursor: pointer; min-height: 2.2rem; display: flex; align-items: center;
+    font-family: var(--label); font-size: .7rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+  }
+  .drawer > summary::-webkit-details-marker { display: none; }
+  .drawer > summary::before { content: '+'; width: 1.1rem; color: var(--gold-2); font-size: .95rem; }
+  .drawer[open] > summary::before { content: '−'; }
+  .drawer-body { display: flex; flex-direction: column; gap: .4rem; padding-top: .3rem; }
+
+  /* ── Lore ── */
+  .sub-label { font-family: var(--label); font-size: .66rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .lore-list { display: flex; flex-direction: column; border: 1px solid var(--line-soft); border-radius: 4px; background: rgba(15, 11, 6, .45); }
+  .lore-item { display: flex; gap: .4rem; align-items: center; padding: .35rem .4rem .35rem .6rem; border-bottom: 1px solid var(--line-soft); }
+  .lore-item:last-child { border-bottom: 0; }
+  .lore-item .txt { flex: 1; font-style: italic; color: var(--text-2); line-height: 1.3; font-size: 1.02rem; }
+  .lore-item .idx { font-family: var(--label); font-size: .7rem; color: var(--muted); min-width: 1rem; }
+  .lore-item.next { background: rgba(196, 162, 101, .08); }
+  .icon-btn {
+    flex: 0 0 auto; min-width: 2.4rem; height: 2.4rem; border-radius: 4px; background: transparent;
+    border: 1px solid var(--line); color: var(--muted); font-family: var(--label); font-size: .65rem; letter-spacing: .06em;
+  }
+  .icon-btn.go { border-color: var(--gold-2); color: var(--gold); padding: 0 .5rem; }
+  .icon-btn.rm:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* ── Kenku ── */
+  .volume { display: flex; align-items: center; gap: .6rem; }
+  .volume input { flex: 1; accent-color: var(--gold); height: 2rem; }
+  .volume span { font-family: var(--label); font-size: .7rem; color: var(--muted); min-width: 2.4rem; text-align: right; }
+
+  /* ── Foundry ── */
+  #eval-code { font-family: Consolas, monospace; font-size: .85rem; }
+  #eval-result { font-family: Consolas, monospace; font-size: .8rem; color: var(--gold); overflow-wrap: anywhere; min-height: 1.2rem; }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; left: 50%; bottom: 1rem; z-index: 100; max-width: calc(100% - 2rem);
+    transform: translate(-50%, 1rem); opacity: 0; pointer-events: none; transition: all .25s ease;
+    padding: .55rem 1rem; border-radius: 99px; background: var(--card); border: 1px solid var(--gold);
+    color: var(--text); font-family: var(--label); font-size: .75rem; letter-spacing: .06em; text-align: center;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, .6);
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast.error { border-color: var(--danger); color: #f0a088; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="title">KtP · GM</div>
+  <div class="session">
+    <label for="session-num">Session</label>
+    <input type="text" id="session-num" inputmode="numeric" autocomplete="off">
+  </div>
+  <div class="status" aria-label="Connections">
+    <span class="pill" id="st-hub" title="Hub WebSocket">HUB</span>
+    <span class="pill" id="st-vtt" title="Foundry bridge peer">VTT</span>
+    <span class="pill" id="st-kfm" title="Kenku FM">KFM</span>
+  </div>
+  <div class="zoom" aria-label="Text size">
+    <button id="zoom-out" title="Smaller">A−</button>
+    <button id="zoom-in" title="Larger">A+</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ═══ Preview ═══ -->
+  <details class="section" data-key="preview" open>
+    <summary>Overlay <span class="summary-note" id="preview-note"></span></summary>
+    <div class="body">
+      <div class="preview" id="preview">
+        <iframe id="preview-frame" src="/overlay" title="Overlay preview" tabindex="-1"></iframe>
+        <video id="preview-camera" autoplay muted playsinline></video>
+      </div>
+      <button class="btn small" id="btn-camera">Show OBS camera</button>
+    </div>
+  </details>
+
+  <!-- ═══ Macros ═══ -->
+  <details class="section" data-key="macros" open>
+    <summary>Macros</summary>
+    <div class="body"><div class="grid two" id="macro-grid"></div></div>
+  </details>
+
+  <!-- ═══ Mood ═══ -->
+  <details class="section" data-key="mood" open>
+    <summary>Mood <span class="summary-note" id="mood-note"></span></summary>
+    <div class="body"><div class="mood-grid" id="mood-grid"></div></div>
+  </details>
+
+  <!-- ═══ Scene ═══ -->
+  <details class="section" data-key="scene" data-kind="scene" open>
+    <summary>Scene</summary>
+    <div class="body">
+      <div class="live" id="scene-live"></div>
+      <div class="presets" id="scene-presets"></div>
+      <details class="drawer">
+        <summary>Custom / edit presets</summary>
+        <div class="drawer-body">
+          <input type="text" id="scene-name" placeholder="Location">
+          <input type="text" id="scene-sub" placeholder="Subtitle">
+          <input type="text" id="scene-foundry" class="hint-input" placeholder="Foundry scene to activate (optional)">
+          <div class="row">
+            <button class="btn primary" id="scene-show">Show</button>
+            <button class="btn" id="scene-save">+ Save preset</button>
+          </div>
+        </div>
+      </details>
+    </div>
+  </details>
+
+  <!-- ═══ NPC ═══ -->
+  <details class="section" data-key="npc" data-kind="npc" open>
+    <summary>NPC</summary>
+    <div class="body">
+      <div class="live" id="npc-live"></div>
+      <div class="presets" id="npc-presets"></div>
+      <details class="drawer">
+        <summary>Custom / edit presets</summary>
+        <div class="drawer-body">
+          <input type="text" id="npc-name" placeholder="Name">
+          <input type="text" id="npc-sub" placeholder="Title">
+          <input type="text" id="npc-foundry" class="hint-input" placeholder="Foundry actor for portrait (optional)">
+          <div class="row">
+            <button class="btn primary" id="npc-show">Show</button>
+            <button class="btn" id="npc-save">+ Save preset</button>
+          </div>
+        </div>
+      </details>
+    </div>
+  </details>
+
+  <!-- ═══ Lore ═══ -->
+  <details class="section" data-key="lore" open>
+    <summary>Lore / Quest Feed <span class="summary-note" id="lore-note"></span></summary>
+    <div class="body">
+      <div class="sub-label">On screen</div>
+      <div class="lore-list" id="lore-screen"></div>
+      <div class="row">
+        <button class="btn primary" id="lore-push-next">Push next</button>
+        <button class="btn danger shrink" id="lore-clear">Clear feed</button>
+      </div>
+      <div class="sub-label">Queued</div>
+      <div class="lore-list" id="lore-queue"></div>
+      <textarea id="lore-input" placeholder="Lore, quest note, flavor text…"></textarea>
+      <div class="row">
+        <button class="btn" id="lore-add">Add to queue</button>
+        <button class="btn primary" id="lore-now">Push now</button>
+      </div>
+    </div>
+  </details>
+
+  <!-- ═══ Kenku FM ═══ -->
+  <details class="section" data-key="kenku">
+    <summary>Audio · Kenku FM</summary>
+    <div class="body">
+      <div class="grid" id="kenku-grid"></div>
+      <div class="volume">
+        <label class="sub-label" for="kenku-volume">Volume</label>
+        <input type="range" id="kenku-volume" min="0" max="100" value="80">
+        <span id="kenku-volume-val">80%</span>
+      </div>
+    </div>
+  </details>
+
+  <!-- ═══ Foundry ═══ -->
+  <details class="section" data-key="foundry">
+    <summary>Foundry VTT</summary>
+    <div class="body">
+      <div class="grid" id="foundry-grid"></div>
+      <div class="row">
+        <input type="text" id="foundry-chat" placeholder="Chat message…" enterkeyhint="send">
+        <button class="btn shrink" id="foundry-chat-send">Send</button>
+      </div>
+      <details class="drawer">
+        <summary>Run JavaScript</summary>
+        <div class="drawer-body">
+          <textarea id="eval-code" rows="3" placeholder="// runs inside Foundry — use return to get a value back (Ctrl+Enter)"></textarea>
+          <div class="row">
+            <div id="eval-result"></div>
+            <button class="btn shrink" id="eval-run">Eval</button>
+          </div>
+        </div>
+      </details>
+    </div>
+  </details>
+
+  <!-- ═══ Settings ═══ -->
+  <details class="section" data-key="settings">
+    <summary>Settings</summary>
+    <div class="body">
+      <label class="sub-label" for="cfg-kenku">Kenku FM URL</label>
+      <div class="row">
+        <input type="text" id="cfg-kenku" placeholder="http://localhost:3333">
+        <button class="btn shrink" id="cfg-kenku-test">Test</button>
+      </div>
+    </div>
+  </details>
+
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// Config
+// ═══════════════════════════════════════════════════════════
+
+// Keys must match the MOODS table in overlay.html — the overlay falls back
+// to neutral for any key it doesn't know. Colors are the overlay's, a touch
+// brighter where needed to read as text on the dark panel.
+const MOODS = {
+  neutral:    { color: '#ddc888', label: 'Neutral' },
+  tense:      { color: '#d94a2b', label: 'Tense' },
+  mysterious: { color: '#9a7ad6', label: 'Mysterious' },
+  festive:    { color: '#e8b520', label: 'Festive' },
+  somber:     { color: '#6a9e9e', label: 'Somber' },
+  dangerous:  { color: '#e03a3a', label: 'Dangerous' },
+};
+
+// Each action is either an overlay state patch / lore call, or a Foundry
+// bridge command: { foundry: 'execute-macro', macroName: 'Initiative' }.
+const MACROS = [
+  { label: 'Combat Start',    glyph: '⚔', actions: [{ state: { mood: 'tense' } }] },
+  { label: 'Combat End',      glyph: '🕊', actions: [{ state: { mood: 'neutral', npcVisible: false } }] },
+  { label: 'Dramatic Reveal', glyph: '✦', actions: [{ state: { mood: 'mysterious' } }] },
+  { label: 'Session Reset',   glyph: '↺', actions: [{ state: { mood: 'neutral', npcVisible: false } }, { lore: 'clear' }] },
+];
+
+// Match names to what's in your Foundry macro bar.
+const FOUNDRY_BUTTONS = [
+  { label: 'Roll Initiative', command: 'execute-macro', params: { macroName: 'Initiative' } },
+  { label: 'Short Rest',      command: 'execute-macro', params: { macroName: 'Short Rest' } },
+  { label: 'Long Rest',       command: 'execute-macro', params: { macroName: 'Long Rest' } },
+  { label: 'Quick d20',       command: 'roll',          params: { formula: '1d20' } },
+  { label: 'Narrate',         command: 'send-chat',     params: { message: '/desc The ground trembles beneath your feet...' } },
+];
+
+// ═══════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════
+let state = {
+  sceneVisible: false, sceneLocation: '', sceneSubtitle: '',
+  npcVisible: false, npcName: '', npcTitle: '',
+  mood: 'neutral', loreFeed: [], loreNextId: 0, session: '',
+};
+// Whole presets.json — kept intact so unknown keys survive a save.
+let presets = { npcs: [], locations: [], lore: [] };
+let hubConnected = false;
+let foundryConnected = false;
+let kenkuConnected = false;
+
+const $ = (id) => document.getElementById(id);
+function esc(text) { const d = document.createElement('div'); d.textContent = text ?? ''; return d.innerHTML; }
+
+// Per-viewer preferences (zoom, collapsed sections, Kenku URL).
+const PREFS_KEY = 'ktp-gm-prefs';
+let prefs = {};
+try { prefs = JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; } catch {}
+function savePrefs() { try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch {} }
+
+// ═══════════════════════════════════════════════════════════
+// Toast
+// ═══════════════════════════════════════════════════════════
+function toast(msg, isError = false) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (isError ? ' error' : '');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { el.className = 'toast'; }, 1800);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Hub API
+// ═══════════════════════════════════════════════════════════
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  if (!res.ok) throw new Error(`${res.status}`);
+  return res.json();
+}
+
+// Partial state merge. Applied locally first so the panel responds instantly;
+// the hub's state-update broadcast then confirms it.
+async function patch(changes, okMsg) {
+  Object.assign(state, changes);
+  renderAll();
+  try {
+    await api('PUT', '/api/state', changes);
+    if (okMsg) toast(okMsg);
+  } catch (e) { toast(`Hub: ${e.message}`, true); }
+}
+
+async function lorePush(text) {
+  try { await api('POST', '/api/lore/push', { text }); toast('Lore pushed'); }
+  catch (e) { toast(`Lore failed: ${e.message}`, true); }
+}
+async function loreClear() {
+  try { await api('POST', '/api/lore/clear'); toast('Feed cleared'); }
+  catch (e) { toast(`Clear failed: ${e.message}`, true); }
+}
+
+function savePresets() {
+  api('PUT', '/api/presets', presets).catch((e) => toast(`Presets not saved: ${e.message}`, true));
+}
+
+// ═══════════════════════════════════════════════════════════
+// WebSocket — state sync + Foundry peer
+// ═══════════════════════════════════════════════════════════
+let ws;
+function connect() {
+  ws = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`);
+  ws.onopen = () => { hubConnected = true; renderStatus(); };
+  ws.onmessage = (e) => {
+    let msg;
+    try { msg = JSON.parse(e.data); } catch { return; }
+    if (msg.type === 'state-update' && msg.state) {
+      state = { ...state, ...msg.state };
+      renderAll();
+    } else if (msg.type === 'peer-status' && msg.peer === 'foundry') {
+      foundryConnected = msg.connected;
+      renderStatus();
+    } else if (msg.type === 'peer-event' && msg.source === 'foundry') {
+      onFoundryEvent(msg);
+    }
+  };
+  ws.onclose = () => {
+    hubConnected = false; foundryConnected = false; renderStatus();
+    setTimeout(connect, 1500);
+  };
+  ws.onerror = () => ws.close();
+}
+
+// Fire-and-forget command to the Foundry bridge. `quiet` suppresses the
+// not-connected warning for side effects (portrait, scene activation).
+function foundry(command, params = {}, quiet = false) {
+  if (!foundryConnected || !ws || ws.readyState !== 1) {
+    if (!quiet) toast('Foundry bridge not connected', true);
+    return false;
+  }
+  ws.send(JSON.stringify({ type: 'peer-command', target: 'foundry', command, ...params }));
+  return true;
+}
+
+function onFoundryEvent(msg) {
+  if (msg.event === 'command-ok' && msg.command === 'eval') {
+    $('eval-result').textContent = msg.result !== undefined ? String(msg.result) : '(ok)';
+  } else if (msg.event === 'command-ok' && msg.command === 'roll') {
+    toast(`Roll ${msg.formula} = ${msg.total}`);
+  } else if (msg.event === 'command-ok') {
+    toast(`Foundry: ${msg.command}`);
+  } else if (msg.event === 'command-error') {
+    if (msg.command === 'eval') $('eval-result').textContent = `Error: ${msg.error}`;
+    toast(`Foundry: ${msg.error}`, true);
+  } else if (msg.event === 'unknown-command') {
+    toast(`Foundry: unknown command ${msg.command}`, true);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Kenku FM (proxied through the hub)
+// ═══════════════════════════════════════════════════════════
+function kenkuUrl() { return $('cfg-kenku').value.trim() || 'http://localhost:3333'; }
+
+async function kenku(method, path, body) {
+  try {
+    const opts = { method, headers: { 'Content-Type': 'application/json', 'X-Kenku-Url': kenkuUrl() } };
+    if (body !== undefined) opts.body = JSON.stringify(body);
+    const res = await fetch(`/api/kenku${path}`, opts);
+    if (!res.ok) throw new Error(`${res.status}`);
+    kenkuConnected = true;
+    return res;
+  } catch (e) {
+    kenkuConnected = false;
+    throw e;
+  } finally { renderStatus(); }
+}
+
+async function kenkuPlayPause() {
+  try {
+    const playing = (await (await kenku('GET', '/v1/playlist/playback')).json()).playing;
+    await kenku('PUT', `/v1/playlist/playback/${playing ? 'pause' : 'play'}`);
+    toast(`Kenku: ${playing ? 'paused' : 'playing'}`);
+  } catch (e) { toast(`Kenku: ${e.message}`, true); }
+}
+async function kenkuPause() {
+  try { await kenku('PUT', '/v1/playlist/playback/pause'); toast('Kenku: paused'); }
+  catch (e) { toast(`Kenku: ${e.message}`, true); }
+}
+async function kenkuPlaylist(id, title) {
+  try { await kenku('PUT', '/v1/playlist/playback/play', { id }); toast(`Kenku: ${title}`); }
+  catch (e) { toast(`Kenku: ${e.message}`, true); }
+}
+
+async function renderKenku() {
+  const grid = $('kenku-grid');
+  grid.innerHTML = '';
+  const add = (label, fn) => {
+    const b = document.createElement('button');
+    b.className = 'btn'; b.textContent = label; b.onclick = fn;
+    grid.appendChild(b);
+  };
+  add('Play / Pause', kenkuPlayPause);
+  add('Pause', kenkuPause);
+  try {
+    const data = await (await kenku('GET', '/v1/playlist')).json();
+    (data.playlists || []).forEach((p) => add(p.title, () => kenkuPlaylist(p.id, p.title)));
+  } catch {}
+}
+
+let volumeTimer;
+$('kenku-volume').oninput = (e) => {
+  const v = parseInt(e.target.value, 10);
+  $('kenku-volume-val').textContent = `${v}%`;
+  clearTimeout(volumeTimer);
+  volumeTimer = setTimeout(() => kenku('PUT', '/v1/playlist/playback/volume', { volume: v / 100 }).catch(() => {}), 120);
+};
+
+// ═══════════════════════════════════════════════════════════
+// Scene & NPC — shared preset logic
+// ═══════════════════════════════════════════════════════════
+const KINDS = {
+  scene: {
+    list: 'locations', subKey: 'subtitle', vttKey: 'foundryScene', tag: 'Scene',
+    current: () => ({ visible: state.sceneVisible, name: state.sceneLocation, sub: state.sceneSubtitle }),
+    show(name, sub, vtt) {
+      patch({ sceneLocation: name, sceneSubtitle: sub, sceneVisible: true }, `Scene: ${name}`);
+      if (vtt) foundry('activate-scene', { sceneName: vtt }, true);
+    },
+    hide() { patch({ sceneVisible: false }, 'Scene hidden'); },
+  },
+  npc: {
+    list: 'npcs', subKey: 'title', vttKey: 'foundryName', tag: 'NPC',
+    current: () => ({ visible: state.npcVisible, name: state.npcName, sub: state.npcTitle }),
+    show(name, sub, vtt) {
+      patch({ npcName: name, npcTitle: sub, npcVisible: true }, `NPC: ${name}`);
+      foundry('show-portrait', { actorName: vtt || name }, true);
+    },
+    hide() { patch({ npcVisible: false }, 'NPC hidden'); },
+  },
+};
+
+function isShown(kind, p) {
+  const c = KINDS[kind].current();
+  return c.visible && c.name === p.name && (c.sub || '') === (p[KINDS[kind].subKey] || '');
+}
+
+function renderLive(kind) {
+  const k = KINDS[kind], c = k.current(), el = $(`${kind}-live`);
+  el.classList.toggle('off', !c.visible);
+  el.innerHTML = c.visible
+    ? `<div class="live-text"><div class="live-tag">On screen</div>
+         <div class="live-name">${esc(c.name)}</div>${c.sub ? `<div class="live-sub">${esc(c.sub)}</div>` : ''}</div>
+       <button class="btn danger shrink" data-hide>Hide</button>`
+    : `<div class="live-text"><div class="live-tag">${k.tag} hidden</div></div>`;
+  el.querySelector('[data-hide]')?.addEventListener('click', () => k.hide());
+}
+
+function renderPresets(kind) {
+  const k = KINDS[kind], list = presets[k.list] || [], box = $(`${kind}-presets`);
+  if (!list.length) { box.innerHTML = '<div class="empty">No presets — add one under Custom</div>'; return; }
+  box.innerHTML = list.map((p, i) => {
+    const sub = p[k.subKey];
+    return `<div class="preset">
+      <button class="preset-btn ${isShown(kind, p) ? 'shown' : ''}" data-i="${i}">
+        <span class="preset-name">${esc(p.name)}${p[k.vttKey] ? '<span class="preset-vtt">VTT</span>' : ''}</span>
+        ${sub ? `<span class="preset-sub">${esc(sub)}</span>` : ''}
+      </button>
+      <button class="preset-rm" data-rm="${i}" title="Delete preset" aria-label="Delete ${esc(p.name)}">×</button>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('[data-i]').forEach((b) => b.onclick = () => {
+    const p = list[+b.dataset.i];
+    // Load into the editor so it can be tweaked, then toggle it live.
+    $(`${kind}-name`).value = p.name;
+    $(`${kind}-sub`).value = p[k.subKey] || '';
+    $(`${kind}-foundry`).value = p[k.vttKey] || '';
+    if (isShown(kind, p)) k.hide();
+    else k.show(p.name, p[k.subKey] || '', p[k.vttKey] || '');
+  });
+  box.querySelectorAll('[data-rm]').forEach((b) => b.onclick = () => {
+    list.splice(+b.dataset.rm, 1);
+    renderPresets(kind);
+    savePresets();
+  });
+}
+
+function bindKind(kind) {
+  const k = KINDS[kind];
+  const read = () => ({ name: $(`${kind}-name`).value.trim(), sub: $(`${kind}-sub`).value.trim(), vtt: $(`${kind}-foundry`).value.trim() });
+  $(`${kind}-show`).onclick = () => {
+    const f = read();
+    if (!f.name) return toast(`Enter a ${kind === 'scene' ? 'location' : 'name'}`, true);
+    k.show(f.name, f.sub, f.vtt);
+  };
+  $(`${kind}-save`).onclick = () => {
+    const f = read();
+    if (!f.name) return toast(`Enter a ${kind === 'scene' ? 'location' : 'name'}`, true);
+    const item = { name: f.name, [k.subKey]: f.sub };
+    if (f.vtt) item[k.vttKey] = f.vtt;
+    (presets[k.list] ||= []).push(item);
+    renderPresets(kind);
+    savePresets();
+    toast(`Saved ${f.name}`);
+  };
+  // Delete buttons only appear while the edit drawer is open.
+  const section = document.querySelector(`.section[data-kind="${kind}"]`);
+  section.querySelector('.drawer').addEventListener('toggle', (e) => section.classList.toggle('editing', e.target.open));
+}
+
+// ═══════════════════════════════════════════════════════════
+// Lore
+// ═══════════════════════════════════════════════════════════
+function renderLore() {
+  const feed = state.loreFeed || [], queue = presets.lore || [];
+  $('lore-screen').innerHTML = feed.length
+    ? feed.map((e) => `<div class="lore-item"><span class="txt">${esc(e.text)}</span></div>`).join('')
+    : '<div class="empty">Nothing on screen</div>';
+  $('lore-queue').innerHTML = queue.length
+    ? queue.map((t, i) => `<div class="lore-item ${i === 0 ? 'next' : ''}">
+        <span class="idx">${i + 1}</span><span class="txt">${esc(t)}</span>
+        <button class="icon-btn go" data-push="${i}" title="Push this entry">Push</button>
+        <button class="icon-btn rm" data-rm="${i}" title="Remove" aria-label="Remove">×</button>
+      </div>`).join('')
+    : '<div class="empty">Queue empty</div>';
+  $('lore-queue').querySelectorAll('[data-push]').forEach((b) => b.onclick = () => pushQueued(+b.dataset.push));
+  $('lore-queue').querySelectorAll('[data-rm]').forEach((b) => b.onclick = () => {
+    queue.splice(+b.dataset.rm, 1); renderLore(); savePresets();
+  });
+  $('lore-push-next').disabled = !queue.length;
+  $('lore-note').textContent = `${feed.length} shown · ${queue.length} queued`;
+}
+
+function pushQueued(i) {
+  const [text] = presets.lore.splice(i, 1);
+  if (text === undefined) return;
+  renderLore(); savePresets(); lorePush(text);
+}
+
+$('lore-push-next').onclick = () => pushQueued(0);
+$('lore-clear').onclick = loreClear;
+$('lore-add').onclick = () => {
+  const text = $('lore-input').value.trim();
+  if (!text) return;
+  (presets.lore ||= []).push(text);
+  $('lore-input').value = '';
+  renderLore(); savePresets();
+};
+$('lore-now').onclick = () => {
+  const text = $('lore-input').value.trim();
+  if (!text) return;
+  $('lore-input').value = '';
+  lorePush(text);
+};
+$('lore-input').onkeydown = (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('lore-add').click(); }
+};
+
+// ═══════════════════════════════════════════════════════════
+// Mood, macros, Foundry
+// ═══════════════════════════════════════════════════════════
+function renderMoods() {
+  const grid = $('mood-grid');
+  grid.innerHTML = Object.entries(MOODS).map(([key, m]) =>
+    `<button class="mood ${state.mood === key ? 'active' : ''}" data-mood="${key}" style="--mc:${m.color}">${m.label}</button>`
+  ).join('');
+  grid.querySelectorAll('[data-mood]').forEach((b) => b.onclick = () => patch({ mood: b.dataset.mood }));
+  $('mood-note').textContent = (MOODS[state.mood] || MOODS.neutral).label;
+}
+
+async function runMacro(m) {
+  for (const a of m.actions) {
+    if (a.state) await patch(a.state);
+    else if (a.lore === 'clear') await loreClear();
+    else if (a.foundry) { const { foundry: cmd, ...params } = a; foundry(cmd, params); }
+  }
+  toast(`✓ ${m.label}`);
+}
+
+function renderStatic() {
+  $('macro-grid').innerHTML = MACROS.map((m, i) =>
+    `<button class="btn macro" data-i="${i}"><span class="glyph">${m.glyph}</span>${esc(m.label)}</button>`).join('');
+  $('macro-grid').querySelectorAll('[data-i]').forEach((b) => b.onclick = () => runMacro(MACROS[+b.dataset.i]));
+
+  $('foundry-grid').innerHTML = FOUNDRY_BUTTONS.map((f, i) =>
+    `<button class="btn" data-i="${i}">${esc(f.label)}</button>`).join('');
+  $('foundry-grid').querySelectorAll('[data-i]').forEach((b) => b.onclick = () => {
+    const f = FOUNDRY_BUTTONS[+b.dataset.i];
+    foundry(f.command, f.params);
+  });
+}
+
+function sendChat() {
+  const msg = $('foundry-chat').value.trim();
+  if (!msg) return;
+  if (foundry('send-chat', { message: msg })) $('foundry-chat').value = '';
+}
+$('foundry-chat-send').onclick = sendChat;
+$('foundry-chat').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); sendChat(); } };
+
+function runEval() {
+  const code = $('eval-code').value.trim();
+  if (!code) return;
+  if (foundry('eval', { code })) $('eval-result').textContent = '…';
+}
+$('eval-run').onclick = runEval;
+$('eval-code').onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); runEval(); } };
+
+// ═══════════════════════════════════════════════════════════
+// Session, status, preview
+// ═══════════════════════════════════════════════════════════
+let sessionTimer;
+$('session-num').oninput = () => {
+  clearTimeout(sessionTimer);
+  sessionTimer = setTimeout(() => patch({ session: $('session-num').value.trim() }), 400);
+};
+
+function renderStatus() {
+  $('st-hub').classList.toggle('on', hubConnected);
+  $('st-vtt').classList.toggle('on', foundryConnected);
+  $('st-kfm').classList.toggle('on', kenkuConnected);
+}
+
+function renderAll() {
+  if (document.activeElement !== $('session-num')) $('session-num').value = state.session || '';
+  renderMoods();
+  renderLive('scene'); renderPresets('scene');
+  renderLive('npc'); renderPresets('npc');
+  renderLore();
+  const parts = [state.sceneVisible && state.sceneLocation, state.npcVisible && state.npcName].filter(Boolean);
+  $('preview-note').textContent = parts.join(' · ');
+}
+
+// Render the real overlay at its native 1920×1080 and scale it to the box.
+const previewBox = $('preview');
+new ResizeObserver(() => {
+  $('preview-frame').style.transform = `scale(${previewBox.clientWidth / 1920})`;
+}).observe(previewBox);
+
+// OBS Virtual Camera in place of the overlay preview.
+let cameraStream = null;
+$('btn-camera').onclick = async () => {
+  const btn = $('btn-camera');
+  if (cameraStream) {
+    cameraStream.getTracks().forEach((t) => t.stop());
+    cameraStream = null;
+    previewBox.classList.remove('camera');
+    btn.textContent = 'Show OBS camera';
+    return;
+  }
+  try {
+    const cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
+    const obs = cams.find((d) => d.label.toLowerCase().includes('obs')) || cams[cams.length - 1];
+    if (!obs) return toast('No camera devices found', true);
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: obs.deviceId }, width: 1920, height: 1080 } });
+    $('preview-camera').srcObject = cameraStream;
+    previewBox.classList.add('camera');
+    btn.textContent = 'Show overlay preview';
+  } catch (e) { toast(`Camera failed: ${e.message}`, true); }
+};
+
+// ═══════════════════════════════════════════════════════════
+// Preferences: zoom, collapsed sections, Kenku URL
+// ═══════════════════════════════════════════════════════════
+function applyZoom() { document.documentElement.style.setProperty('--ui-scale', prefs.zoom || 1); }
+function zoom(step) {
+  prefs.zoom = Math.min(2.5, Math.max(0.7, Math.round(((prefs.zoom || 1) + step) * 10) / 10));
+  applyZoom(); savePrefs();
+  toast(`Text size ${Math.round(prefs.zoom * 100)}%`);
+}
+$('zoom-in').onclick = () => zoom(0.1);
+$('zoom-out').onclick = () => zoom(-0.1);
+
+prefs.open ||= {};
+document.querySelectorAll('.section[data-key]').forEach((s) => {
+  const key = s.dataset.key;
+  if (key in prefs.open) s.open = prefs.open[key];
+  s.addEventListener('toggle', (e) => {
+    if (e.target !== s) return; // ignore nested drawers
+    prefs.open[key] = s.open; savePrefs();
+  });
+});
+
+// Carry the Kenku URL over from the old /remote page on first load.
+if (prefs.kenkuUrl === undefined) {
+  try { prefs.kenkuUrl = JSON.parse(localStorage.getItem('ktp-remote-config'))?.['cfg-kenku'] || ''; } catch { prefs.kenkuUrl = ''; }
+  savePrefs();
+}
+$('cfg-kenku').value = prefs.kenkuUrl;
+$('cfg-kenku').oninput = () => { prefs.kenkuUrl = $('cfg-kenku').value.trim(); savePrefs(); };
+$('cfg-kenku-test').onclick = async () => {
+  try { await kenku('GET', '/v1/playlist'); toast('Kenku FM connected'); renderKenku(); }
+  catch (e) { toast(`Kenku FM: ${e.message}`, true); }
+};
+
+// ═══════════════════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════════════════
+applyZoom();
+bindKind('scene');
+bindKind('npc');
+renderStatic();
+renderAll();
+renderStatus();
+api('GET', '/api/presets').then((data) => {
+  presets = { npcs: [], locations: [], lore: [], ...data };
+  renderAll();
+}).catch(() => toast('Could not load presets', true));
+connect();
+renderKenku();
+setInterval(() => kenku('GET', '/v1/playlist').catch(() => {}), 10000);
+</script>
+</body>
+</html>
