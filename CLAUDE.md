@@ -42,7 +42,8 @@ The `~/Development/ktp/README.md` has a system diagram.
 
 ```
 ktp-hub/
-├── server.js              — Bun server, all routes inline
+├── server.js              — Bun server: REST routes, WS bus, peer routing
+├── openapi.js             — OpenAPI spec for /api (keep in step with routes)
 ├── package.json           — bun runtime only, no deps
 ├── clients/               — browser pages served by the hub
 │   ├── overlay.html       — transparent OBS browser source projection
@@ -50,7 +51,8 @@ ktp-hub/
 │                            (preview, macros, mood, scene, NPC, lore, Kenku, Foundry)
 └── data/
     ├── state.json         — runtime session state (scene/NPC/mood/lore)
-    └── presets.json       — NPC and location library for the campaign
+    ├── presets.json       — NPC and location library + lore queue
+    └── macros.json        — GM macros (overlay/lore/Foundry action lists)
 ```
 
 ## Commands
@@ -118,19 +120,31 @@ who's online.
 
 ## HTTP API
 
-- `GET /api/state` — current scene/NPC/mood/lore-feed state.
-- `PUT /api/state` — partial merge, persists to `data/state.json`,
-  broadcasts `state-update`.
-- `POST /api/lore/push` `{text}` — append lore-feed entry (capped at 6).
-- `POST /api/lore/clear` — empty the feed.
-- `GET /api/presets` / `PUT /api/presets` — campaign NPC and location
-  library.
-- `POST /api/peers/:name/command` `{command, ...params}` — forward a
-  command to a connected named peer, wait up to 10s for the matching
-  `peer-event` response (matched by `requestId`).
-- `POST /api/kenku/*` — passthrough proxy to a local Kenku FM instance
-  for audio control. Caller supplies the Kenku base URL via the
-  `X-Kenku-Url` header.
+Every GM-panel action is a REST endpoint, documented as OpenAPI 3.1 at
+`GET /api/openapi.json` (built in `openapi.js`) with a one-line-per-endpoint
+index at `GET /api`. The GM panel itself uses these endpoints, so anything
+it can do is scriptable with `curl` (e.g. by an LLM). Groups:
+
+- **Status/overlay** — `/api/status`, `/api/state`, `/api/mood`,
+  `/api/session`, `/api/scene/show|hide`, `/api/npc/show|hide`. Scene and
+  NPC shows also drive Foundry (scene activation, portrait).
+- **Lore** — `/api/lore/push|clear` (on screen, capped at 6) and
+  `/api/lore/queue…` (staged lines, stored in `presets.json` `lore`).
+- **Presets** — `/api/presets/{locations|npcs}`, upsert/delete by name.
+- **Macros** — `/api/macros`, `/api/macros/{id}/run`; defined in
+  `data/macros.json`.
+- **Audio** — `/api/audio…` wraps Kenku FM's remote API (default
+  `KENKU_URL` = `http://localhost:3333`, per-request `X-Kenku-Url`
+  header overrides). `/api/kenku/*` remains a raw passthrough.
+- **Foundry** — `/api/foundry/{roll|chat|macro|scene|portrait|eval}`
+  send bridge commands and wait for the reply; `/api/peers/:name/command`
+  is the generic form. 503 = bridge not connected, 504 = no reply in 10s,
+  422 = the command failed in Foundry.
+
+Errors are always `{"error": "..."}`. State changes broadcast
+`state-update`; preset/queue changes broadcast `presets-update`.
+Adding an endpoint: add a `route(...)` in `server.js` **and** its entry in
+`openapi.js`.
 
 ## Things to know
 

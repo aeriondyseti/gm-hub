@@ -1,0 +1,26 @@
+[
+  {
+    "id": "combat-start",
+    "label": "Combat Start",
+    "glyph": "⚔",
+    "actions": [{ "state": { "mood": "tense" } }]
+  },
+  {
+    "id": "combat-end",
+    "label": "Combat End",
+    "glyph": "🕊",
+    "actions": [{ "state": { "mood": "neutral", "npcVisible": false } }]
+  },
+  {
+    "id": "dramatic-reveal",
+    "label": "Dramatic Reveal",
+    "glyph": "✦",
+    "actions": [{ "state": { "mood": "mysterious" } }]
+  },
+  {
+    "id": "session-reset",
+    "label": "Session Reset",
+    "glyph": "↺",
+    "actions": [{ "state": { "mood": "neutral", "npcVisible": false } }, { "lore": "clear" }]
+  }
+]

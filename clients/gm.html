@@ -415,22 +415,14 @@ const MOODS = {
   dangerous:  { color: '#e03a3a', label: 'Dangerous' },
 };
 
-// Each action is either an overlay state patch / lore call, or a Foundry
-// bridge command: { foundry: 'execute-macro', macroName: 'Initiative' }.
-const MACROS = [
-  { label: 'Combat Start',    glyph: '⚔', actions: [{ state: { mood: 'tense' } }] },
-  { label: 'Combat End',      glyph: '🕊', actions: [{ state: { mood: 'neutral', npcVisible: false } }] },
-  { label: 'Dramatic Reveal', glyph: '✦', actions: [{ state: { mood: 'mysterious' } }] },
-  { label: 'Session Reset',   glyph: '↺', actions: [{ state: { mood: 'neutral', npcVisible: false } }, { lore: 'clear' }] },
-];
-
-// Match names to what's in your Foundry macro bar.
+// Match names to what's in your Foundry macro bar. Each button posts to
+// /api/foundry/<path> with its body.
 const FOUNDRY_BUTTONS = [
-  { label: 'Roll Initiative', command: 'execute-macro', params: { macroName: 'Initiative' } },
-  { label: 'Short Rest',      command: 'execute-macro', params: { macroName: 'Short Rest' } },
-  { label: 'Long Rest',       command: 'execute-macro', params: { macroName: 'Long Rest' } },
-  { label: 'Quick d20',       command: 'roll',          params: { formula: '1d20' } },
-  { label: 'Narrate',         command: 'send-chat',     params: { message: '/desc The ground trembles beneath your feet...' } },
+  { label: 'Roll Initiative', path: 'macro', body: { macroName: 'Initiative' } },
+  { label: 'Short Rest',      path: 'macro', body: { macroName: 'Short Rest' } },
+  { label: 'Long Rest',       path: 'macro', body: { macroName: 'Long Rest' } },
+  { label: 'Quick d20',       path: 'roll',  body: { formula: '1d20' } },
+  { label: 'Narrate',         path: 'chat',  body: { message: '/desc The ground trembles beneath your feet...' } },
 ];
 
 // ═══════════════════════════════════════════════════════════
@@ -441,8 +433,9 @@ let state = {
   npcVisible: false, npcName: '', npcTitle: '',
   mood: 'neutral', loreFeed: [], loreNextId: 0, session: '',
 };
-// Whole presets.json — kept intact so unknown keys survive a save.
+// Mirrors data/presets.json; the hub pushes presets-update on every change.
 let presets = { npcs: [], locations: [], lore: [] };
+let macros = [];
 let hubConnected = false;
 let foundryConnected = false;
 let kenkuConnected = false;
@@ -468,42 +461,30 @@ function toast(msg, isError = false) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// Hub API
+// Hub API — the panel uses the same REST endpoints documented at
+// /api/openapi.json, so anything it does can be scripted with curl.
 // ═══════════════════════════════════════════════════════════
-async function api(method, path, body) {
-  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+async function api(method, path, body, headers = {}) {
+  const opts = { method, headers: { 'Content-Type': 'application/json', ...headers } };
   if (body !== undefined) opts.body = JSON.stringify(body);
   const res = await fetch(path, opts);
-  if (!res.ok) throw new Error(`${res.status}`);
-  return res.json();
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
 }
 
-// Partial state merge. Applied locally first so the panel responds instantly;
-// the hub's state-update broadcast then confirms it.
-async function patch(changes, okMsg) {
-  Object.assign(state, changes);
-  renderAll();
+// Call an endpoint, toasting okMsg on success or the hub's error message on
+// failure. Resolves to the response data, or null on failure.
+async function act(method, path, body, okMsg) {
   try {
-    await api('PUT', '/api/state', changes);
+    const data = await api(method, path, body);
     if (okMsg) toast(okMsg);
-  } catch (e) { toast(`Hub: ${e.message}`, true); }
-}
-
-async function lorePush(text) {
-  try { await api('POST', '/api/lore/push', { text }); toast('Lore pushed'); }
-  catch (e) { toast(`Lore failed: ${e.message}`, true); }
-}
-async function loreClear() {
-  try { await api('POST', '/api/lore/clear'); toast('Feed cleared'); }
-  catch (e) { toast(`Clear failed: ${e.message}`, true); }
-}
-
-function savePresets() {
-  api('PUT', '/api/presets', presets).catch((e) => toast(`Presets not saved: ${e.message}`, true));
+    return data;
+  } catch (e) { toast(e.message, true); return null; }
 }
 
 // ═══════════════════════════════════════════════════════════
-// WebSocket — state sync + Foundry peer
+// WebSocket — live state, presets and Foundry events
 // ═══════════════════════════════════════════════════════════
 let ws;
 function connect() {
@@ -514,6 +495,9 @@ function connect() {
     try { msg = JSON.parse(e.data); } catch { return; }
     if (msg.type === 'state-update' && msg.state) {
       state = { ...state, ...msg.state };
+      renderAll();
+    } else if (msg.type === 'presets-update' && msg.presets) {
+      presets = { npcs: [], locations: [], lore: [], ...msg.presets };
       renderAll();
     } else if (msg.type === 'peer-status' && msg.peer === 'foundry') {
       foundryConnected = msg.connected;
@@ -529,65 +513,36 @@ function connect() {
   ws.onerror = () => ws.close();
 }
 
-// Fire-and-forget command to the Foundry bridge. `quiet` suppresses the
-// not-connected warning for side effects (portrait, scene activation).
-function foundry(command, params = {}, quiet = false) {
-  if (!foundryConnected || !ws || ws.readyState !== 1) {
-    if (!quiet) toast('Foundry bridge not connected', true);
-    return false;
-  }
-  ws.send(JSON.stringify({ type: 'peer-command', target: 'foundry', command, ...params }));
-  return true;
-}
-
+// Every Foundry reply is broadcast, so this also reports commands sent by
+// other API callers. Eval results are shown from the HTTP response instead.
 function onFoundryEvent(msg) {
-  if (msg.event === 'command-ok' && msg.command === 'eval') {
-    $('eval-result').textContent = msg.result !== undefined ? String(msg.result) : '(ok)';
-  } else if (msg.event === 'command-ok' && msg.command === 'roll') {
-    toast(`Roll ${msg.formula} = ${msg.total}`);
-  } else if (msg.event === 'command-ok') {
-    toast(`Foundry: ${msg.command}`);
-  } else if (msg.event === 'command-error') {
-    if (msg.command === 'eval') $('eval-result').textContent = `Error: ${msg.error}`;
-    toast(`Foundry: ${msg.error}`, true);
-  } else if (msg.event === 'unknown-command') {
-    toast(`Foundry: unknown command ${msg.command}`, true);
-  }
+  if (msg.command === 'eval') return;
+  if (msg.event === 'command-ok' && msg.command === 'roll') toast(`Roll ${msg.formula} = ${msg.total}`);
+  else if (msg.event === 'command-ok') toast(`Foundry: ${msg.command}`);
+  else if (msg.event === 'command-error') toast(`Foundry: ${msg.error}`, true);
+  else if (msg.event === 'unknown-command') toast(`Foundry: unknown command ${msg.command}`, true);
 }
 
 // ═══════════════════════════════════════════════════════════
-// Kenku FM (proxied through the hub)
+// Kenku FM (/api/audio)
 // ═══════════════════════════════════════════════════════════
-function kenkuUrl() { return $('cfg-kenku').value.trim() || 'http://localhost:3333'; }
-
-async function kenku(method, path, body) {
+async function audio(method, path, body) {
+  const headers = prefs.kenkuUrl ? { 'X-Kenku-Url': prefs.kenkuUrl } : {};
   try {
-    const opts = { method, headers: { 'Content-Type': 'application/json', 'X-Kenku-Url': kenkuUrl() } };
-    if (body !== undefined) opts.body = JSON.stringify(body);
-    const res = await fetch(`/api/kenku${path}`, opts);
-    if (!res.ok) throw new Error(`${res.status}`);
+    const data = await api(method, `/api/audio${path}`, body, headers);
     kenkuConnected = true;
-    return res;
+    return data;
   } catch (e) {
     kenkuConnected = false;
     throw e;
   } finally { renderStatus(); }
 }
 
-async function kenkuPlayPause() {
+async function audioAct(method, path, body, okMsg) {
   try {
-    const playing = (await (await kenku('GET', '/v1/playlist/playback')).json()).playing;
-    await kenku('PUT', `/v1/playlist/playback/${playing ? 'pause' : 'play'}`);
-    toast(`Kenku: ${playing ? 'paused' : 'playing'}`);
-  } catch (e) { toast(`Kenku: ${e.message}`, true); }
-}
-async function kenkuPause() {
-  try { await kenku('PUT', '/v1/playlist/playback/pause'); toast('Kenku: paused'); }
-  catch (e) { toast(`Kenku: ${e.message}`, true); }
-}
-async function kenkuPlaylist(id, title) {
-  try { await kenku('PUT', '/v1/playlist/playback/play', { id }); toast(`Kenku: ${title}`); }
-  catch (e) { toast(`Kenku: ${e.message}`, true); }
+    const data = await audio(method, path, body);
+    toast(typeof okMsg === 'function' ? okMsg(data) : okMsg);
+  } catch (e) { toast(e.message, true); }
 }
 
 async function renderKenku() {
@@ -598,11 +553,11 @@ async function renderKenku() {
     b.className = 'btn'; b.textContent = label; b.onclick = fn;
     grid.appendChild(b);
   };
-  add('Play / Pause', kenkuPlayPause);
-  add('Pause', kenkuPause);
+  add('Play / Pause', () => audioAct('POST', '/toggle', undefined, (d) => `Kenku: ${d.playing ? 'playing' : 'paused'}`));
+  add('Pause', () => audioAct('POST', '/pause', undefined, 'Kenku: paused'));
   try {
-    const data = await (await kenku('GET', '/v1/playlist')).json();
-    (data.playlists || []).forEach((p) => add(p.title, () => kenkuPlaylist(p.id, p.title)));
+    const data = await audio('GET', '/playlists');
+    (data.playlists || []).forEach((p) => add(p.title, () => audioAct('POST', '/play', { id: p.id }, `Kenku: ${p.title}`)));
   } catch {}
 }
 
@@ -611,30 +566,34 @@ $('kenku-volume').oninput = (e) => {
   const v = parseInt(e.target.value, 10);
   $('kenku-volume-val').textContent = `${v}%`;
   clearTimeout(volumeTimer);
-  volumeTimer = setTimeout(() => kenku('PUT', '/v1/playlist/playback/volume', { volume: v / 100 }).catch(() => {}), 120);
+  volumeTimer = setTimeout(() => audio('PUT', '/volume', { volume: v }).catch(() => {}), 120);
 };
 
 // ═══════════════════════════════════════════════════════════
 // Scene & NPC — shared preset logic
 // ═══════════════════════════════════════════════════════════
+
+// Show via /api/scene/show or /api/npc/show; flags a failed Foundry side effect.
+async function showOn(path, body, okMsg) {
+  const r = await act('POST', path, body);
+  if (!r) return;
+  if (r.foundry && !r.foundry.ok) toast(`${okMsg} · Foundry: ${r.foundry.error}`, true);
+  else toast(okMsg);
+}
+
 const KINDS = {
   scene: {
     list: 'locations', subKey: 'subtitle', vttKey: 'foundryScene', tag: 'Scene',
     current: () => ({ visible: state.sceneVisible, name: state.sceneLocation, sub: state.sceneSubtitle }),
-    show(name, sub, vtt) {
-      patch({ sceneLocation: name, sceneSubtitle: sub, sceneVisible: true }, `Scene: ${name}`);
-      if (vtt) foundry('activate-scene', { sceneName: vtt }, true);
-    },
-    hide() { patch({ sceneVisible: false }, 'Scene hidden'); },
+    show(name, sub, vtt) { showOn('/api/scene/show', { name, subtitle: sub, foundryScene: vtt }, `Scene: ${name}`); },
+    hide() { act('POST', '/api/scene/hide', undefined, 'Scene hidden'); },
   },
   npc: {
     list: 'npcs', subKey: 'title', vttKey: 'foundryName', tag: 'NPC',
     current: () => ({ visible: state.npcVisible, name: state.npcName, sub: state.npcTitle }),
-    show(name, sub, vtt) {
-      patch({ npcName: name, npcTitle: sub, npcVisible: true }, `NPC: ${name}`);
-      foundry('show-portrait', { actorName: vtt || name }, true);
-    },
-    hide() { patch({ npcVisible: false }, 'NPC hidden'); },
+    // Portrait only when the bridge is up, so a closed Foundry doesn't nag.
+    show(name, sub, vtt) { showOn('/api/npc/show', { name, title: sub, foundryName: vtt, portrait: foundryConnected }, `NPC: ${name}`); },
+    hide() { act('POST', '/api/npc/hide', undefined, 'NPC hidden'); },
   },
 };
 
@@ -677,9 +636,8 @@ function renderPresets(kind) {
     else k.show(p.name, p[k.subKey] || '', p[k.vttKey] || '');
   });
   box.querySelectorAll('[data-rm]').forEach((b) => b.onclick = () => {
-    list.splice(+b.dataset.rm, 1);
-    renderPresets(kind);
-    savePresets();
+    const p = list[+b.dataset.rm];
+    act('DELETE', `/api/presets/${k.list}/${encodeURIComponent(p.name)}`, undefined, `Deleted ${p.name}`);
   });
 }
 
@@ -694,12 +652,8 @@ function bindKind(kind) {
   $(`${kind}-save`).onclick = () => {
     const f = read();
     if (!f.name) return toast(`Enter a ${kind === 'scene' ? 'location' : 'name'}`, true);
-    const item = { name: f.name, [k.subKey]: f.sub };
-    if (f.vtt) item[k.vttKey] = f.vtt;
-    (presets[k.list] ||= []).push(item);
-    renderPresets(kind);
-    savePresets();
-    toast(`Saved ${f.name}`);
+    // Saving an existing name updates that preset.
+    act('POST', `/api/presets/${k.list}`, { name: f.name, [k.subKey]: f.sub, [k.vttKey]: f.vtt }, `Saved ${f.name}`);
   };
   // Delete buttons only appear while the edit drawer is open.
   const section = document.querySelector(`.section[data-kind="${kind}"]`);
@@ -721,34 +675,23 @@ function renderLore() {
         <button class="icon-btn rm" data-rm="${i}" title="Remove" aria-label="Remove">×</button>
       </div>`).join('')
     : '<div class="empty">Queue empty</div>';
-  $('lore-queue').querySelectorAll('[data-push]').forEach((b) => b.onclick = () => pushQueued(+b.dataset.push));
-  $('lore-queue').querySelectorAll('[data-rm]').forEach((b) => b.onclick = () => {
-    queue.splice(+b.dataset.rm, 1); renderLore(); savePresets();
-  });
+  $('lore-queue').querySelectorAll('[data-push]').forEach((b) => b.onclick = () =>
+    act('POST', `/api/lore/queue/${b.dataset.push}/push`, undefined, 'Lore pushed'));
+  $('lore-queue').querySelectorAll('[data-rm]').forEach((b) => b.onclick = () =>
+    act('DELETE', `/api/lore/queue/${b.dataset.rm}`));
   $('lore-push-next').disabled = !queue.length;
   $('lore-note').textContent = `${feed.length} shown · ${queue.length} queued`;
 }
 
-function pushQueued(i) {
-  const [text] = presets.lore.splice(i, 1);
-  if (text === undefined) return;
-  renderLore(); savePresets(); lorePush(text);
-}
-
-$('lore-push-next').onclick = () => pushQueued(0);
-$('lore-clear').onclick = loreClear;
-$('lore-add').onclick = () => {
+$('lore-push-next').onclick = () => act('POST', '/api/lore/queue/next', undefined, 'Lore pushed');
+$('lore-clear').onclick = () => act('POST', '/api/lore/clear', undefined, 'Feed cleared');
+$('lore-add').onclick = async () => {
   const text = $('lore-input').value.trim();
-  if (!text) return;
-  (presets.lore ||= []).push(text);
-  $('lore-input').value = '';
-  renderLore(); savePresets();
+  if (text && await act('POST', '/api/lore/queue', { text })) $('lore-input').value = '';
 };
-$('lore-now').onclick = () => {
+$('lore-now').onclick = async () => {
   const text = $('lore-input').value.trim();
-  if (!text) return;
-  $('lore-input').value = '';
-  lorePush(text);
+  if (text && await act('POST', '/api/lore/push', { text }, 'Lore pushed')) $('lore-input').value = '';
 };
 $('lore-input').onkeydown = (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('lore-add').click(); }
@@ -762,44 +705,50 @@ function renderMoods() {
   grid.innerHTML = Object.entries(MOODS).map(([key, m]) =>
     `<button class="mood ${state.mood === key ? 'active' : ''}" data-mood="${key}" style="--mc:${m.color}">${m.label}</button>`
   ).join('');
-  grid.querySelectorAll('[data-mood]').forEach((b) => b.onclick = () => patch({ mood: b.dataset.mood }));
+  grid.querySelectorAll('[data-mood]').forEach((b) => b.onclick = () => act('PUT', '/api/mood', { mood: b.dataset.mood }));
   $('mood-note').textContent = (MOODS[state.mood] || MOODS.neutral).label;
 }
 
-async function runMacro(m) {
-  for (const a of m.actions) {
-    if (a.state) await patch(a.state);
-    else if (a.lore === 'clear') await loreClear();
-    else if (a.foundry) { const { foundry: cmd, ...params } = a; foundry(cmd, params); }
-  }
-  toast(`✓ ${m.label}`);
-}
-
-function renderStatic() {
-  $('macro-grid').innerHTML = MACROS.map((m, i) =>
-    `<button class="btn macro" data-i="${i}"><span class="glyph">${m.glyph}</span>${esc(m.label)}</button>`).join('');
-  $('macro-grid').querySelectorAll('[data-i]').forEach((b) => b.onclick = () => runMacro(MACROS[+b.dataset.i]));
-
-  $('foundry-grid').innerHTML = FOUNDRY_BUTTONS.map((f, i) =>
-    `<button class="btn" data-i="${i}">${esc(f.label)}</button>`).join('');
-  $('foundry-grid').querySelectorAll('[data-i]').forEach((b) => b.onclick = () => {
-    const f = FOUNDRY_BUTTONS[+b.dataset.i];
-    foundry(f.command, f.params);
+// Macros live in data/macros.json and run on the hub.
+function renderMacros() {
+  $('macro-grid').innerHTML = macros.length
+    ? macros.map((m, i) => `<button class="btn macro" data-i="${i}"><span class="glyph">${esc(m.glyph || '▶')}</span>${esc(m.label)}</button>`).join('')
+    : '<div class="empty">No macros</div>';
+  $('macro-grid').querySelectorAll('[data-i]').forEach((b) => b.onclick = async () => {
+    const m = macros[+b.dataset.i];
+    const r = await act('POST', `/api/macros/${encodeURIComponent(m.id)}/run`);
+    if (!r) return;
+    const failed = r.results.find((x) => x.ok === false);
+    if (failed) toast(`${m.label} · Foundry: ${failed.error}`, true);
+    else toast(`✓ ${m.label}`);
   });
 }
 
-function sendChat() {
-  const msg = $('foundry-chat').value.trim();
-  if (!msg) return;
-  if (foundry('send-chat', { message: msg })) $('foundry-chat').value = '';
+function renderFoundryButtons() {
+  $('foundry-grid').innerHTML = FOUNDRY_BUTTONS.map((f, i) =>
+    `<button class="btn" data-i="${i}">${esc(f.label)}</button>`).join('');
+  // Success toasts arrive as Foundry events over the WebSocket.
+  $('foundry-grid').querySelectorAll('[data-i]').forEach((b) => b.onclick = () => {
+    const f = FOUNDRY_BUTTONS[+b.dataset.i];
+    act('POST', `/api/foundry/${f.path}`, f.body);
+  });
+}
+
+async function sendChat() {
+  const message = $('foundry-chat').value.trim();
+  if (message && await act('POST', '/api/foundry/chat', { message })) $('foundry-chat').value = '';
 }
 $('foundry-chat-send').onclick = sendChat;
 $('foundry-chat').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); sendChat(); } };
 
-function runEval() {
+async function runEval() {
   const code = $('eval-code').value.trim();
   if (!code) return;
-  if (foundry('eval', { code })) $('eval-result').textContent = '…';
+  $('eval-result').textContent = '…';
+  try {
+    const r = await api('POST', '/api/foundry/eval', { code });
+    $('eval-result').textContent = r.result !== undefined ? r.result : '(ok)';
+  } catch (e) { $('eval-result').textContent = `Error: ${e.message}`; }
 }
 $('eval-run').onclick = runEval;
 $('eval-code').onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); runEval(); } };
@@ -810,7 +759,7 @@ $('eval-code').onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.met
 let sessionTimer;
 $('session-num').oninput = () => {
   clearTimeout(sessionTimer);
-  sessionTimer = setTimeout(() => patch({ session: $('session-num').value.trim() }), 400);
+  sessionTimer = setTimeout(() => act('PUT', '/api/session', { session: $('session-num').value.trim() }), 400);
 };
 
 function renderStatus() {
@@ -917,8 +866,8 @@ if (prefs.kenkuUrl === undefined) {
 $('cfg-kenku').value = prefs.kenkuUrl;
 $('cfg-kenku').oninput = () => { prefs.kenkuUrl = $('cfg-kenku').value.trim(); savePrefs(); };
 $('cfg-kenku-test').onclick = async () => {
-  try { await kenku('GET', '/v1/playlist'); toast('Kenku FM connected'); renderKenku(); }
-  catch (e) { toast(`Kenku FM: ${e.message}`, true); }
+  try { await audio('GET', '/playlists'); toast('Kenku FM connected'); renderKenku(); }
+  catch (e) { toast(e.message, true); }
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -927,16 +876,18 @@ $('cfg-kenku-test').onclick = async () => {
 applyZoom();
 bindKind('scene');
 bindKind('npc');
-renderStatic();
+renderFoundryButtons();
 renderAll();
 renderStatus();
 api('GET', '/api/presets').then((data) => {
   presets = { npcs: [], locations: [], lore: [], ...data };
   renderAll();
 }).catch(() => toast('Could not load presets', true));
+api('GET', '/api/macros').then((data) => { macros = data; renderMacros(); })
+  .catch(() => toast('Could not load macros', true));
 connect();
 renderKenku();
-setInterval(() => kenku('GET', '/v1/playlist').catch(() => {}), 10000);
+setInterval(() => audio('GET', '/playlists').catch(() => {}), 10000);
 </script>
 </body>
 </html>
