@@ -464,7 +464,7 @@ function toast(msg, isError = false) {
   el.textContent = msg;
   el.className = 'toast show' + (isError ? ' error' : '');
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => { el.className = 'toast'; }, 1800);
+  toast._t = setTimeout(() => { el.className = 'toast'; }, isError ? 5000 : 1800);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -837,24 +837,54 @@ new ResizeObserver(() => {
 
 // OBS Virtual Camera in place of the overlay preview.
 let cameraStream = null;
+const stopStream = (s) => s?.getTracks().forEach((t) => t.stop());
+
+async function openObsCamera() {
+  // The browser hides camera labels and ids until camera permission is
+  // granted, so open any camera first (this triggers the prompt), then
+  // find the OBS one by label and switch to it.
+  let stream = await navigator.mediaDevices.getUserMedia({ video: true });
+  const cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
+  const obs = cams.find((d) => /obs/i.test(d.label));
+  if (!obs) {
+    stopStream(stream);
+    throw Object.assign(new Error('OBS Virtual Camera not found'), { name: 'NoObsCamera' });
+  }
+  if (stream.getVideoTracks()[0]?.getSettings().deviceId !== obs.deviceId) {
+    stopStream(stream);
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: { exact: obs.deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+    });
+  }
+  return stream;
+}
+
+function cameraError(e) {
+  switch (e.name) {
+    case 'NotAllowedError':   return 'Camera blocked — allow camera for this page in the browser (lock icon in the address bar)';
+    case 'NotFoundError':     return 'No cameras found — start Virtual Camera in OBS';
+    case 'NoObsCamera':       return 'OBS Virtual Camera not found — click Start Virtual Camera in OBS';
+    case 'NotReadableError':  return 'Camera busy — another app may be holding it';
+    case 'OverconstrainedError': return 'Could not open OBS Virtual Camera';
+    default:                  return `Camera failed: ${e.message || e.name}`;
+  }
+}
+
 $('btn-camera').onclick = async () => {
   const btn = $('btn-camera');
   if (cameraStream) {
-    cameraStream.getTracks().forEach((t) => t.stop());
+    stopStream(cameraStream);
     cameraStream = null;
     previewBox.classList.remove('camera');
     btn.textContent = 'Show OBS camera';
     return;
   }
   try {
-    const cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
-    const obs = cams.find((d) => d.label.toLowerCase().includes('obs')) || cams[cams.length - 1];
-    if (!obs) return toast('No camera devices found', true);
-    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: obs.deviceId }, width: 1920, height: 1080 } });
+    cameraStream = await openObsCamera();
     $('preview-camera').srcObject = cameraStream;
     previewBox.classList.add('camera');
     btn.textContent = 'Show overlay preview';
-  } catch (e) { toast(`Camera failed: ${e.message}`, true); }
+  } catch (e) { toast(cameraError(e), true); }
 };
 
 // ═══════════════════════════════════════════════════════════
