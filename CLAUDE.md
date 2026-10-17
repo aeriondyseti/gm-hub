@@ -159,6 +159,16 @@ Adding an endpoint: add a `route(...)` in `server.js` **and** its entry in
   `server.upgrade()`. Not Node-compatible without a runtime swap.
 - **No build step.** Edit `server.js` and restart; edit a
   `clients/*.html` and refresh.
+- **Known security issue (open; from Sable's review 0.4.106 M2, her
+  ADR-0512; moved here 2026-10-16).** The hub listens on every network
+  interface (`Bun.serve` with no `hostname`), has no authentication and
+  no `Origin` check, and broadcasts every peer reply to all other
+  sockets. While it runs, anything that can reach port `3001` on the
+  network can run `eval` in the GM's browser through the Foundry bridge
+  and read what that browser reads, GM-only content included. Fix: bind
+  `127.0.0.1`; refuse a browser `Origin` on `/api/peers/*`; answer a
+  command's reply only to the HTTP caller that sent it, not to every
+  socket. Do this before the hub runs on a network that isn't trusted.
 
 ## Connected peers
 
