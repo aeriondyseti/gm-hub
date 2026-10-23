@@ -1,12 +1,12 @@
 {
   "sceneVisible": false,
-  "sceneLocation": "Private Meeting Room",
-  "sceneSubtitle": "A quiet place for quiet conversations.",
+  "sceneLocation": "",
+  "sceneSubtitle": "",
   "npcVisible": false,
-  "npcName": "Amara",
-  "npcTitle": "Empress-in-waiting",
-  "mood": "neutral",
+  "npcName": "Bartalemaeus al-Katib",
+  "npcTitle": "Tabularius",
+  "mood": "festive",
   "loreFeed": [],
   "loreNextId": 5,
-  "session": "14"
+  "session": "23"
 }

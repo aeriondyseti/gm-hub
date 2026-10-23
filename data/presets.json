@@ -1,50 +1,26 @@
 {
   "npcs": [
     {
-      "name": "Bastien Amun-Ro",
-      "title": "Prefect of the Judicator Caste; Party’s patron"
-    },
-    {
-      "name": "Amara",
-      "title": "Empress-in-waiting"
-    },
-    {
-      "name": "Remus Thanep",
-      "title": "Court Magister; expert on the Darkness Wars"
-    },
-    {
-      "name": "Kael",
-      "title": "A young man with a falcon."
+      "name": "A Young Boy",
+      "title": "Servant to the Aeons"
     }
   ],
   "locations": [
     {
-      "name": "Sunken District",
-      "subtitle": "Home to refugees and malcontents"
+      "name": "Empty Desert Grounds",
+      "subtitle": "All that's left of the Bazaar Bizarre"
     },
     {
-      "name": "Hyrian Camp",
-      "subtitle": "Expats who decided to stay--or couldn't go home"
+      "name": "Starry Trail",
+      "subtitle": "Magical Path Through the Storm"
     },
     {
-      "name": "Receiving Chamber",
-      "subtitle": "A place to wait in light and comfort"
+      "name": "Stillpoint Archive",
+      "subtitle": "Lost Solaaran Outpost"
     },
     {
-      "name": "Thanep's Study Room",
-      "subtitle": "Filled with chaos... and knowledge"
-    },
-    {
-      "name": "Seshan Family Home",
-      "subtitle": "Heavy with the weight of scholarship and expectations"
-    },
-    {
-      "name": "Private Meeting Room",
-      "subtitle": "A quiet place for quiet conversations."
-    },
-    {
-      "name": "Gate of the Morning Sun",
-      "subtitle": "A place to wait in light and comfort"
+      "name": "Tower of Aeons",
+      "subtitle": "Home of the Oracle"
     }
   ],
   "lore": []

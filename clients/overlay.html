@@ -15,8 +15,13 @@
   }
 
   /* ── Frame ── */
+  /* Fixed 16:9 design stage (1920x1080), scaled to fit the browser source
+     and centred. Change STAGE_W / STAGE_H in the script for other ratios. */
   #overlay-frame {
-    position: absolute; inset: 0; overflow: hidden;
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px; overflow: hidden;
+    transform-origin: center center;
+    transform: translate(-50%, -50%);
   }
   #mood-vignette {
     position: absolute; inset: 0; pointer-events: none; z-index: 5;
@@ -283,6 +288,16 @@
 </div>
 
 <script>
+// ── Widescreen stage: fixed 1920x1080 design, scaled to fit ──
+const STAGE_W = 1920, STAGE_H = 1080;
+const frameEl = document.getElementById('overlay-frame');
+function fitStage() {
+  const s = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
+  frameEl.style.transform = `translate(-50%, -50%) scale(${s})`;
+}
+window.addEventListener('resize', fitStage);
+fitStage();
+
 const MOODS = {
   neutral:    { color: '#ddc888', glow: 'rgba(196, 162, 101, 0.03)' },
   tense:      { color: '#d94a2b', glow: 'rgba(217, 74, 43, 0.45)' },
@@ -420,7 +435,7 @@ connect();
 render({
   sceneVisible: false, sceneLocation: '', sceneSubtitle: '',
   npcVisible: false, npcName: '', npcTitle: '',
-  mood: 'neutral', loreFeed: [], session: '12',
+  mood: 'neutral', loreFeed: [], session: '22',
 });
 </script>
 </body>
