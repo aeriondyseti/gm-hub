@@ -3,21 +3,20 @@
 The session-state hub for **Keys to Perfection**. Bun server on port
 `3001` that owns the shared session state, broadcasts changes over
 WebSocket, and acts as the message bus between named **peers**
-(Foundry bridge, hexploration, future tools).
+(the Foundry bridge and future tools).
 
 The hub is also the host for two browser **clients**: the OBS overlay
 and the GM panel. The overlay is the hub's canonical *projection* — its
 read-only render targeting OBS. The GM panel is the GM's *input* surface
 (it replaced the old separate control and remote pages) and may
-eventually move to a sibling `ktp-console/` repo (see backlog in
-`../hexploration/ROADMAP.md`).
+eventually move to a sibling `ktp-console/` repo.
 
 ## Taxonomy
 
 | Term     | What                                                | Examples                              |
 |----------|-----------------------------------------------------|---------------------------------------|
 | **Hub**  | This server. Owns state, runs the bus + REST + WS.  | `ktp-hub/` (this repo)                |
-| **Peers**| WS-connected tools exchanging commands and events.  | `ktp-foundry-bridge`, `hexploration`  |
+| **Peers**| WS-connected tools exchanging commands and events.  | `ktp-foundry-bridge`                  |
 | **Clients** | Browser pages that consume the hub's HTTP+WS.    | `overlay.html`, `gm.html` |
 
 Peers are symmetric on the wire — any peer can send commands or events
@@ -29,9 +28,6 @@ peer protocol.
 
 Lives in `~/Development/ktp/` alongside:
 
-- **`../hexploration/`** — TTRPG hexploration tool. Will connect as the
-  `hex` peer and emit typed events that map onto overlay surfaces
-  (e.g. `day-advanced` → scene banner). See `../hexploration/ROADMAP.md`.
 - **`../ktp-foundry-bridge/`** — Foundry VTT module that connects as the
   `foundry` peer. Exposes a command registry; routes commands from the
   hub into Foundry and events from Foundry out to other peers.
@@ -175,4 +171,3 @@ Adding an endpoint: add a `route(...)` in `server.js` **and** its entry in
 | Peer name  | Repo                       | Status                         |
 |------------|----------------------------|--------------------------------|
 | `foundry`  | `../ktp-foundry-bridge/`   | v1.4.0+ (uses generalized API) |
-| `hex`      | `../hexploration/`         | planned (see hex Phase 3)      |
