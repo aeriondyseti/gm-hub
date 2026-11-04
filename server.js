@@ -9,6 +9,13 @@ const MACROS_PATH = join(DATA_DIR, "macros.json");
 const CLIENTS_DIR = join(import.meta.dir, "clients");
 const PORT = Number(process.env.PORT) || 3001;
 const KENKU_URL = process.env.KENKU_URL || "http://localhost:3333";
+// Browser origins allowed besides the hub's own pages, and Host names allowed
+// besides this machine's loopback names: comma-separated, each replacing its
+// default. The bridge connects from Foundry's page, so Foundry's origins are
+// the default. Over `tailscale serve`, add the machine's tailnet name to
+// ALLOWED_HOSTS and https://<that name> to ALLOWED_ORIGINS.
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS ?? "http://localhost:30000,http://127.0.0.1:30000";
+const ALLOWED_HOSTS = process.env.ALLOWED_HOSTS ?? "";
 
 // Mood keys the overlay knows how to render (MOODS in clients/overlay.html).
 const MOODS = ["neutral", "tense", "mysterious", "festive", "somber", "dangerous"];
@@ -148,6 +155,94 @@ function pushLore(text) {
 
 function clearLore() {
   return setState({ loreFeed: [] });
+}
+
+// ── Who may talk to the hub ──
+//
+// Every request is checked before anything else:
+// - Host: it must name this hub, as localhost, 127.0.0.1 or [::1] on PORT, or
+//   a name in ALLOWED_HOSTS on any port, or it is refused with 421. A page on
+//   another site that points a name of its own at this machine (DNS
+//   rebinding) sends that name.
+// - Origin: any request but GET and HEAD, and every /ws request (the WebSocket
+//   upgrade), is refused with 403 when it carries a browser Origin other than
+//   the hub's own (http://<an allowed name>:PORT) or one in ALLOWED_ORIGINS.
+//   With no Origin it passes: browsers send one with every request but GET
+//   and HEAD and with every WebSocket, so its absence there means curl, a
+//   script or a peer that isn't a browser page. `Origin: null` (a sandboxed
+//   or file:// page) is refused.
+// This is not authentication: anything on the network that isn't a browser
+// can still send any Host and no Origin.
+
+const LOOPBACK_NAMES = ["localhost", "127.0.0.1", "[::1]"];
+
+// "name", "name:port", "[v6]" or "[v6]:port" → { name, port } (port null when
+// none given), or null if it isn't a host. A trailing dot is dropped.
+function parseHost(value) {
+  const m = /^(\[[0-9a-f:.]+\]|[a-z0-9-]+(?:\.[a-z0-9-]+)*)\.?(?::(\d{1,5}))?$/i.exec(value ?? "");
+  return m ? { name: m[1].toLowerCase(), port: m[2] === undefined ? null : Number(m[2]) } : null;
+}
+
+// "scheme://host[:port]" of an http or https URL, or null.
+function originOf(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+// An ALLOWED_HOSTS entry is a name, allowed on any port: a browser behind
+// `tailscale serve` on 443 sends the name with no port at all.
+function hostName(entry) {
+  const host = parseHost(entry);
+  if (host?.port != null) console.warn(`ALLOWED_HOSTS: ${JSON.stringify(entry)} allows ${host.name} on any port; its port is ignored`);
+  return host?.name ?? null;
+}
+
+function settingList(name, value, parse, kind) {
+  const out = [];
+  for (const entry of value.split(",").map((s) => s.trim()).filter(Boolean)) {
+    const parsed = parse(entry);
+    if (parsed) out.push(parsed);
+    else console.warn(`${name}: ignoring ${JSON.stringify(entry)}, which isn't ${kind}`);
+  }
+  return out;
+}
+
+const extraHosts = settingList("ALLOWED_HOSTS", ALLOWED_HOSTS, hostName, "a host name");
+const extraOrigins = settingList("ALLOWED_ORIGINS", ALLOWED_ORIGINS, originOf, "an http or https origin");
+const ownOrigins = [...LOOPBACK_NAMES, ...extraHosts].map((name) => originOf(`http://${name}:${PORT}`));
+const allowedOrigins = new Set([...ownOrigins, ...extraOrigins]);
+
+function hostAllowed(header) {
+  const host = parseHost(header);
+  if (!host) return false;
+  if (LOOPBACK_NAMES.includes(host.name)) return (host.port ?? 80) === PORT;
+  return extraHosts.includes(host.name);
+}
+
+function originAllowed(header) {
+  if (header === null) return true;
+  const origin = originOf(header);
+  return origin !== null && allowedOrigins.has(origin);
+}
+
+// The refusal for a request the hub won't serve, or null to serve it.
+function refusal(req) {
+  const host = req.headers.get("host");
+  if (!hostAllowed(host)) {
+    console.warn(`Refused ${req.method} for Host ${JSON.stringify(host)}: not this hub's (ALLOWED_HOSTS adds a name)`);
+    return Response.json({ error: `This hub doesn't answer to Host ${host}; ALLOWED_HOSTS adds a name` }, { status: 421 });
+  }
+  const origin = req.headers.get("origin");
+  const { pathname } = new URL(req.url);
+  if ((pathname === "/ws" || !["GET", "HEAD"].includes(req.method)) && !originAllowed(origin)) {
+    console.warn(`Refused ${req.method} ${pathname} from Origin ${JSON.stringify(origin)} (ALLOWED_ORIGINS adds one)`);
+    return Response.json({ error: `Requests from Origin ${origin} are refused; ALLOWED_ORIGINS adds one` }, { status: 403 });
+  }
+  return null;
 }
 
 // ── HTTP helpers ──
@@ -501,6 +596,8 @@ function serveStatic(path) {
 const server = Bun.serve({
   port: PORT,
   async fetch(req, server) {
+    const refused = refusal(req);
+    if (refused) return refused;
     const url = new URL(req.url);
 
     // WebSocket upgrade
@@ -596,3 +693,5 @@ console.log(`Keys to Perfection Hub running on http://localhost:${PORT}`);
 console.log(`  Overlay: http://localhost:${PORT}/overlay`);
 console.log(`  GM:      http://localhost:${PORT}/gm`);
 console.log(`  API:     http://localhost:${PORT}/api  (OpenAPI: /api/openapi.json)`);
+console.log(`  Other origins allowed (ALLOWED_ORIGINS): ${extraOrigins.join(", ") || "none"}`);
+console.log(`  Other hosts allowed (ALLOWED_HOSTS):     ${extraHosts.join(", ") || "none"}`);

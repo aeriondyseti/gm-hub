@@ -2,7 +2,8 @@
   "name": "ktp-hub",
   "version": "1.0.0",
   "scripts": {
-    "start": "bun run server.js"
+    "start": "bun run server.js",
+    "test": "node --test"
   },
   "dependencies": {}
 }

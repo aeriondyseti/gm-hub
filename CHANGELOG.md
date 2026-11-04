@@ -51,3 +51,16 @@ Releases are tagged `ktp-hub-vX.Y.Z`.
 - The OBS camera preview no longer fails with a blank "Camera failed:" error: it asks for camera permission first,
   then picks the OBS Virtual Camera by label, and common failures get clear messages (47fb7a9, 2026-10-15).
 - Kenku FM playlist buttons switch playlists instead of only resuming playback (71402c1).
+
+### Security
+
+- Other sites' pages can no longer drive the hub through a browser. Until now any web page open in a browser that
+  could reach the hub could send it commands, `eval` in Foundry included, even with the hub on localhost: it took
+  cross-site POSTs and checked no `Origin` on the WebSocket. Now every request other than GET or HEAD, and every
+  WebSocket upgrade, is refused with 403 (and logged) when its `Origin` is neither the hub's own nor one in the new
+  `ALLOWED_ORIGINS` setting, which defaults to Foundry's (`http://localhost:30000`, `http://127.0.0.1:30000`), where
+  the bridge connects from. `Origin: null` is refused; a request with no `Origin` (curl, a script) still passes.
+- Against DNS rebinding, every request must name the hub in its `Host`: `localhost`, `127.0.0.1` or `[::1]` on the
+  hub's port, or a name in the new `ALLOWED_HOSTS` setting; anything else gets 421. Opening the hub by any other
+  name (the machine's LAN name or address, a Tailscale name) now needs that name in `ALLOWED_HOSTS`, and a page
+  served over `tailscale serve` also needs its `https://` origin in `ALLOWED_ORIGINS`.
