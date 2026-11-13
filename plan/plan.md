@@ -8,20 +8,18 @@ Nothing is being built.
 
 ## Next
 
-**rename-and-push.** Kevin: rename the GitHub repository `aeriondyseti/ktp-hub` to gm-hub, keep it private, set
-`origin` to the new address and push `main`. Before that, decide about two branches that hold work not on `main`:
-`wsl-salvage-2026-10` on GitHub (`2d04b95`, 2026-10-22: work salvaged from the WSL copy, based on the June protocol
-commit: overlay tweaks, preset and state data, and two scripts, audit-party.js and ktp-eval.mjs) and the local
-`wip/pre-reorg-changes` (`17eb547`: the uncommitted changes found in the checkout on 2026-11-12, to the overlay
-page, the presets and the state file, and the same two scripts). Done when the repository is renamed and pushed
-and each branch is merged or dropped.
+**decide-the-parked-branches.** Kevin: two branches hold hub work that is not on `main`: `wsl-salvage-2026-10` on
+GitHub (`2d04b95`, 2026-10-22: work salvaged from the WSL copy, based on the June protocol commit: overlay tweaks,
+preset and state data, and two scripts, audit-party.js and ktp-eval.mjs) and the local `wip/pre-reorg-changes`
+(`17eb547`: the uncommitted changes found in the checkout on 2026-11-12, to the overlay page, the presets and the
+state file, and the same two scripts). Done when each is merged or dropped.
 
-**retire-the-bridge-repository.** Kevin: archive `aeriondyseti/ktp-foundry-bridge` on GitHub and remove its
-checkout, `X:\Development\ktp-foundry-bridge`; its history up to v1.7.0 is in this repository. Done when the
-repository is archived.
+**remove-the-bridge-checkout.** Kevin: remove `X:\Development\ktp-foundry-bridge`, the checkout of the bridge's old
+repository, now archived on GitHub; its history up to v1.7.0 is in this repository. Done when it is gone.
 
-**install-the-bridge-on-forge.** Kevin: on Forge, uninstall ktp-foundry-bridge, install the bridge from a zip of
-`foundry-bridge/` (its README says how) and enter the hub's WebSocket address again. Done when the GM panel drives
+**install-the-bridge-on-forge.** Kevin: on Forge, uninstall ktp-foundry-bridge, install the bridge from the zip of a
+release (or of a manual run of the release workflow; `foundry-bridge/README.md` says how) and enter the hub's
+WebSocket address again. Done when the GM panel drives
 Foundry on Forge through the module under its new ID.
 
 ## Ideas

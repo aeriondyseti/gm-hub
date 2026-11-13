@@ -104,7 +104,7 @@ builds the zip as an artifact and makes no release. Nothing publishes the hub.
 
 ## Git
 
-- Trunk: `main`; remote `origin` is GitHub `aeriondyseti/ktp-hub`, to be renamed gm-hub (`plan/plan.md`). The
+- Trunk: `main`; remote `origin` is GitHub `aeriondyseti/gm-hub` (renamed from ktp-hub on 2026-11-12). The
   repository is private. A branch is named by the piece of work it holds; the branch is the claim.
 - The checkout is `X:\Development\tabletop\gm-hub`, beside Kevin's other tabletop repositories. A branch's worktree
   is a sibling folder, `..\gm-hub.<name>`; never a worktree inside the checkout (`.claude/worktrees/` is gitignored
