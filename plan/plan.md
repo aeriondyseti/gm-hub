@@ -17,9 +17,9 @@ state file, and the same two scripts). Done when each is merged or dropped.
 **remove-the-bridge-checkout.** Kevin: remove `X:\Development\ktp-foundry-bridge`, the checkout of the bridge's old
 repository, now archived on GitHub; its history up to v1.7.0 is in this repository. Done when it is gone.
 
-**install-the-bridge-on-forge.** Kevin: on Forge, uninstall ktp-foundry-bridge, install the bridge from the zip of a
-release (or of a manual run of the release workflow; `foundry-bridge/README.md` says how) and enter the hub's
-WebSocket address again. Done when the GM panel drives
+**install-the-bridge-on-forge.** Kevin: on Forge, uninstall ktp-foundry-bridge, install the bridge from its manifest URL,
+https://github.com/aeriondyseti/gm-hub/releases/latest/download/module.json, and enter the hub's WebSocket
+address again. Done when the GM panel drives
 Foundry on Forge through the module under its new ID.
 
 ## Ideas
