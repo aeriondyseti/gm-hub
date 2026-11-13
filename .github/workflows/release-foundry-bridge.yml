@@ -1,0 +1,62 @@
+name: Release the Foundry bridge
+
+# A tag foundry-bridge-vX.Y.Z publishes the bridge as a GitHub Release: the module zip and its module.json.
+# A manual run builds the same zip and keeps it as a workflow artifact, without making a release.
+
+on:
+  push:
+    tags:
+      - 'foundry-bridge-v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify the tag matches module.json
+        if: github.event_name == 'push'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG#foundry-bridge-v}"
+          MODULE_VERSION=$(jq -r .version foundry-bridge/module.json)
+          if [ "$VERSION" != "$MODULE_VERSION" ]; then
+            echo "::error::Tag $TAG does not match foundry-bridge/module.json ($MODULE_VERSION)"
+            exit 1
+          fi
+
+      - name: Check the module
+        run: |
+          node --check foundry-bridge/scripts/bridge.js
+          test "$(jq -r .id foundry-bridge/module.json)" = "gm-hub-bridge"
+
+      - name: Package the module
+        run: |
+          # Foundry wants the module's files inside a folder named for its ID.
+          mkdir -p build/gm-hub-bridge
+          cp foundry-bridge/module.json build/gm-hub-bridge/
+          cp -r foundry-bridge/scripts build/gm-hub-bridge/
+          (cd build && zip -r ../gm-hub-bridge.zip gm-hub-bridge)
+          cp foundry-bridge/module.json module.json
+
+      - name: Keep the zip (manual run)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gm-hub-bridge
+          path: |
+            gm-hub-bridge.zip
+            module.json
+
+      - name: Create the release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: GM Hub Bridge ${{ github.ref_name }}
+          files: |
+            gm-hub-bridge.zip
+            module.json

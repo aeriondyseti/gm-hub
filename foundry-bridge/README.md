@@ -26,9 +26,15 @@ object and may call `sendEvent(...)` to push a `peer-event` back to the hub.
 
 ## Installing it
 
-Zip `module.json` and `scripts/` inside a folder named `gm-hub-bridge` and install that zip in Foundry (on Forge,
-through its module import). The module has no manifest link yet, so Foundry's own updater doesn't see new
-versions.
+Each release of the bridge is a GitHub Release of this repository holding `gm-hub-bridge.zip` and its
+`module.json`. Download the zip and install it in Foundry (on Forge, through its module import). The repository is
+private, so the module has no manifest link and Foundry's own updater doesn't see new versions: a new version is
+installed the same way.
+
+A release is made by pushing a tag `foundry-bridge-vX.Y.Z` that matches the version in `module.json`
+(`.github/workflows/release-foundry-bridge.yml` in the repository's root). Running that workflow by hand builds the
+same zip without making a release. To make the zip yourself: put `module.json` and `scripts/` inside a folder named
+`gm-hub-bridge` and zip the folder.
 
 It replaces the module published as `ktp-foundry-bridge`: uninstall that one first.
 

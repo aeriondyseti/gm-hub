@@ -15,5 +15,6 @@ as ktp-foundry-bridge, and are in its history there.
   Hub Bridge). Foundry treats it as a new module: uninstall the old one, install this one and enter the hub's
   WebSocket address again in each world (tabletop-layout).
 - The module lives in the gm-hub repository beside the hub, as `foundry-bridge/`, and has no manifest or download
-  link: it is installed from a zip (tabletop-layout).
+  link: it is installed from the zip in each GitHub Release, which a `foundry-bridge-vX.Y.Z` tag publishes
+  (tabletop-layout).
 - Macros can reach the bridge as `gmHubBridge` as well as `ktpBridge` (tabletop-layout).

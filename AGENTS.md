@@ -18,6 +18,7 @@ hub/               the hub: Bun server (REST API, WebSocket peer bus), clients/ 
 foundry-bridge/    GM Hub Bridge, the Foundry VTT module: module.json and scripts/bridge.js
 plan/plan.md       work that comes and goes (the `planning` skill)
 docs/              what is in force or true now: decisions.md, design.md (with the glossary), protocol.md, security.md
+.github/workflows/ release-foundry-bridge.yml: publishes the bridge when a foundry-bridge-v* tag is pushed
 <component>/README.md      what is in the component's folder and how to run it
 <component>/CHANGELOG.md   what was done, one per component, [Unreleased] first; none at the root
 ```
@@ -55,6 +56,10 @@ bun X:\Development\scripts\release.ts --component foundry-bridge --version-file 
 
 `hub/package.json` is the hub's version file and `foundry-bridge/module.json` the bridge's; each goes with every
 release of its component. The hub's first release is 0.1.0 (`--bump minor`).
+
+Pushing a `foundry-bridge-vX.Y.Z` tag publishes the bridge: `.github/workflows/release-foundry-bridge.yml` checks
+the tag against `module.json`, zips the module and makes a GitHub Release with the zip. Run by hand, the workflow
+builds the zip as an artifact and makes no release. Nothing publishes the hub.
 
 ## Rules for working here
 
