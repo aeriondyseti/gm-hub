@@ -1,5 +1,5 @@
 {
-  "name": "ktp-hub",
+  "name": "gm-hub",
   "version": "1.0.0",
   "scripts": {
     "start": "bun run server.js",

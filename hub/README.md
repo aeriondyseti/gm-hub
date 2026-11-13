@@ -1,8 +1,8 @@
-# ktp-hub
+# hub
 
-The KtP GM hub: a Bun server that holds the live session state for Keys to Perfection and serves an OBS overlay and
-a GM panel. Every panel action is also a REST endpoint, and the hub drives Foundry VTT through the separate
-ktp-foundry-bridge module.
+The GM hub: a Bun server that holds the live session state and serves an OBS overlay and
+a GM panel. Every panel action is also a REST endpoint, and the hub drives Foundry VTT through the Foundry bridge
+in [`../foundry-bridge/`](../foundry-bridge/).
 
 **It has no authentication and listens on every network interface. Run it only on a network you trust**; the detail
 is in [docs/security.md](../docs/security.md).
@@ -31,5 +31,5 @@ settings that widen who may reach it. There is no build step: edit `server.js` a
 
 Tests: `npm test` (Node's test runner; needs Bun on the PATH).
 
-More: [docs/ktp-hub-protocol.md](../docs/ktp-hub-protocol.md) (the WebSocket protocol and HTTP API),
+More: [docs/protocol.md](../docs/protocol.md) (the WebSocket protocol and HTTP API),
 [docs/design.md](../docs/design.md) (what is built, and the hub's terms in its glossary).

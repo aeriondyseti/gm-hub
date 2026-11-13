@@ -1,6 +1,6 @@
 // Who may talk to the hub: the Host and Origin checks in server.js.
 //
-// Each hub under test is a copy of ktp-hub/ (without data/ or test/) in a
+// Each hub under test is a copy of hub/ (without data/ or test/) in a
 // temporary folder, run with Bun on a free port, so it never touches the
 // real data/ or port 3001. Requests go through node:http so the test can set
 // Host and Origin the way a browser would.

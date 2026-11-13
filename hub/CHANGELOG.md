@@ -1,10 +1,10 @@
 # Changelog
 
-All notable changes to ktp-hub will be documented in this file.
+All notable changes to the hub will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-Releases are tagged `ktp-hub-vX.Y.Z`.
+Releases are tagged `hub-vX.Y.Z`.
 
 ## [Unreleased]
 
@@ -34,8 +34,8 @@ Releases are tagged `ktp-hub-vX.Y.Z`.
 - The GM panel uses the REST API instead of raw state merges, WebSocket peer commands and the Kenku passthrough.
   Saving a preset under an existing name updates it instead of adding a duplicate, and NPC portraits are requested
   only while the Foundry bridge is up (71402c1).
-- The hub moved into the ttrpg-and-larp-stuff repo as `ktp-hub/`, with its history. Versions follow semver from its
-  first release here, `ktp-hub-v0.1.0`; the `1.0.0` in `package.json` was never a release.
+- The hub is in the gm-hub repository as `hub/`, beside its Foundry bridge, and is named the hub (it was ktp-hub).
+  Versions follow semver from its first release, `hub-v0.1.0`; the `1.0.0` in `package.json` was never a release.
 
 ### Removed
 

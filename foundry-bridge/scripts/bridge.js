@@ -87,7 +87,7 @@ let reconnectDelay = 1000;
 const MAX_RECONNECT_DELAY = 30000;
 
 function getServerUrl() {
-  return game.settings.get("ktp-foundry-bridge", "overlayServerUrl");
+  return game.settings.get("gm-hub-bridge", "overlayServerUrl");
 }
 
 function connect() {
@@ -102,13 +102,13 @@ function connect() {
   try {
     ws = new WebSocket(url);
   } catch (e) {
-    console.error("[KTP Bridge] WebSocket creation failed:", e);
+    console.error("[GM Hub Bridge] WebSocket creation failed:", e);
     scheduleReconnect();
     return;
   }
 
   ws.addEventListener("open", () => {
-    console.log("[KTP Bridge] Connected to ktp-hub");
+    console.log("[GM Hub Bridge] Connected to gm-hub");
     reconnectDelay = 1000;
     ws.send(JSON.stringify({ type: "identify", peer: "foundry" }));
   });
@@ -120,12 +120,12 @@ function connect() {
         handleCommand(msg);
       }
     } catch (e) {
-      console.error("[KTP Bridge] Failed to parse message:", e);
+      console.error("[GM Hub Bridge] Failed to parse message:", e);
     }
   });
 
   ws.addEventListener("close", () => {
-    console.warn("[KTP Bridge] Disconnected from ktp-hub");
+    console.warn("[GM Hub Bridge] Disconnected from gm-hub");
     ws = null;
     scheduleReconnect();
   });
@@ -148,7 +148,7 @@ function cleanup() {
 
 function scheduleReconnect() {
   if (reconnectTimer) return;
-  console.log(`[KTP Bridge] Reconnecting in ${reconnectDelay / 1000}s...`);
+  console.log(`[GM Hub Bridge] Reconnecting in ${reconnectDelay / 1000}s...`);
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
     reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
@@ -170,7 +170,7 @@ async function handleCommand(msg) {
   const { type, target, requestId, command, ...params } = msg;
   const handler = commands.get(command);
   if (!handler) {
-    console.warn(`[KTP Bridge] Unknown command: ${command}`);
+    console.warn(`[GM Hub Bridge] Unknown command: ${command}`);
     sendEvent("unknown-command", { command, requestId });
     return;
   }
@@ -178,7 +178,7 @@ async function handleCommand(msg) {
     const result = await handler(params);
     sendEvent("command-ok", { command, requestId, ...(result || {}) });
   } catch (e) {
-    console.error(`[KTP Bridge] Command "${command}" failed:`, e);
+    console.error(`[GM Hub Bridge] Command "${command}" failed:`, e);
     sendEvent("command-error", { command, requestId, error: e.message });
   }
 }
@@ -196,11 +196,10 @@ function sendEvent(event, data = {}) {
 // ── Settings & Lifecycle ────────────────────────────────────────────────────
 
 Hooks.once("init", () => {
-  // Setting key stays `overlayServerUrl` so existing worlds keep their saved
-  // value across this rename; only the display text refers to ktp-hub.
-  game.settings.register("ktp-foundry-bridge", "overlayServerUrl", {
-    name: "ktp-hub WebSocket URL",
-    hint: "WebSocket URL of the ktp-hub server (e.g. ws://localhost:3001/ws)",
+  // The setting key is still `overlayServerUrl`, from the module's first name.
+  game.settings.register("gm-hub-bridge", "overlayServerUrl", {
+    name: "gm-hub WebSocket URL",
+    hint: "WebSocket URL of the gm-hub server (e.g. ws://localhost:3001/ws)",
     scope: "world",
     config: true,
     type: String,
@@ -217,11 +216,11 @@ Hooks.once("ready", () => {
   // permissions. Only hub-driven commands need the socket, and those
   // are GM operations by definition.
   if (!game.user.isGM) {
-    console.log("[KTP Bridge] Non-GM user — not connecting to ktp-hub");
+    console.log("[GM Hub Bridge] Non-GM user — not connecting to gm-hub");
     return;
   }
   connect();
-  console.log("[KTP Bridge] Module loaded");
+  console.log("[GM Hub Bridge] Module loaded");
 });
 
 // Expose for macro/module use
@@ -233,3 +232,6 @@ globalThis.ktpBridge = {
     return ws?.readyState === WebSocket.OPEN;
   },
 };
+
+// The module's name for itself; ktpBridge stays so existing macros keep working.
+globalThis.gmHubBridge = globalThis.ktpBridge;
