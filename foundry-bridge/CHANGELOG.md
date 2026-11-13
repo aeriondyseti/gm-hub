@@ -9,6 +9,8 @@ as ktp-foundry-bridge, and are in its history there.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-12
+
 ### Changed
 
 - **BREAKING** The module's ID is `gm-hub-bridge` and its title GM Hub Bridge (it was `ktp-foundry-bridge`, KTP
@@ -18,3 +20,6 @@ as ktp-foundry-bridge, and are in its history there.
   `https://github.com/aeriondyseti/gm-hub/releases/latest/download/module.json`, so Foundry's updater follows its
   releases there (tabletop-layout).
 - Macros can reach the bridge as `gmHubBridge` as well as `ktpBridge` (tabletop-layout).
+
+[Unreleased]: https://github.com/aeriondyseti/gm-hub/compare/foundry-bridge-v2.0.0...HEAD
+[2.0.0]: https://github.com/aeriondyseti/gm-hub/releases/tag/foundry-bridge-v2.0.0
