@@ -1,6 +1,6 @@
 # gm-hub
 
-The GM's hub for a streamed tabletop session, and the Foundry VTT module that connects Foundry to it. Private.
+The GM's hub for a streamed tabletop session, and the Foundry VTT module that connects Foundry to it.
 
 | Folder | What it is |
 | --- | --- |

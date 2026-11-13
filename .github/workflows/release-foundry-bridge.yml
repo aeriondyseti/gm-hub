@@ -1,6 +1,8 @@
 name: Release the Foundry bridge
 
-# A tag foundry-bridge-vX.Y.Z publishes the bridge as a GitHub Release: the module zip and its module.json.
+# A tag foundry-bridge-vX.Y.Z publishes the bridge as a GitHub Release: the module zip and its module.json. The
+# release is marked latest, so the manifest URL in module.json (releases/latest/download/module.json) finds it and
+# Foundry's updater sees each new version. Only the bridge makes GitHub Releases in this repository.
 # A manual run builds the same zip and keeps it as a workflow artifact, without making a release.
 
 on:
@@ -33,15 +35,26 @@ jobs:
         run: |
           node --check foundry-bridge/scripts/bridge.js
           test "$(jq -r .id foundry-bridge/module.json)" = "gm-hub-bridge"
+          test "$(jq -r .manifest foundry-bridge/module.json)" = "https://github.com/${{ github.repository }}/releases/latest/download/module.json"
 
       - name: Package the module
+        env:
+          TAG: ${{ github.ref_name }}
+          EVENT: ${{ github.event_name }}
         run: |
+          # A release's module.json downloads that release's own zip; Foundry reads the manifest for the newest
+          # version and installs from its download link.
+          if [ "$EVENT" = "push" ]; then
+            DOWNLOAD="https://github.com/${{ github.repository }}/releases/download/$TAG/gm-hub-bridge.zip"
+          else
+            DOWNLOAD=$(jq -r .download foundry-bridge/module.json)
+          fi
           # Foundry wants the module's files inside a folder named for its ID.
           mkdir -p build/gm-hub-bridge
-          cp foundry-bridge/module.json build/gm-hub-bridge/
+          jq --arg url "$DOWNLOAD" '.download = $url' foundry-bridge/module.json > build/gm-hub-bridge/module.json
           cp -r foundry-bridge/scripts build/gm-hub-bridge/
           (cd build && zip -r ../gm-hub-bridge.zip gm-hub-bridge)
-          cp foundry-bridge/module.json module.json
+          cp build/gm-hub-bridge/module.json module.json
 
       - name: Keep the zip (manual run)
         if: github.event_name == 'workflow_dispatch'
@@ -57,6 +70,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: GM Hub Bridge ${{ github.ref_name }}
+          make_latest: true
           files: |
             gm-hub-bridge.zip
             module.json

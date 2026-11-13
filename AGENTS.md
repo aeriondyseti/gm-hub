@@ -58,8 +58,12 @@ bun X:\Development\scripts\release.ts --component foundry-bridge --version-file 
 release of its component. The hub's first release is 0.1.0 (`--bump minor`).
 
 Pushing a `foundry-bridge-vX.Y.Z` tag publishes the bridge: `.github/workflows/release-foundry-bridge.yml` checks
-the tag against `module.json`, zips the module and makes a GitHub Release with the zip. Run by hand, the workflow
-builds the zip as an artifact and makes no release. Nothing publishes the hub.
+the tag against `module.json`, zips the module and makes a GitHub Release with the zip, marked latest. Run by hand,
+the workflow builds the zip as an artifact and makes no release. Nothing publishes the hub.
+
+The bridge's manifest URL points at the latest release's `module.json` (`foundry-bridge/module.json` has it), so Foundry's updater reads whichever GitHub
+Release is marked latest. Only the bridge makes GitHub Releases here; any other release (the hub's, if it ever gets
+one) is made with "Set as the latest release" off, or every Foundry with the bridge stops seeing its updates.
 
 ## Rules for working here
 
@@ -104,8 +108,8 @@ builds the zip as an artifact and makes no release. Nothing publishes the hub.
 
 ## Git
 
-- Trunk: `main`; remote `origin` is GitHub `aeriondyseti/gm-hub` (renamed from ktp-hub on 2026-11-12). The
-  repository is private. A branch is named by the piece of work it holds; the branch is the claim.
+- Trunk: `main`; remote `origin` is GitHub `aeriondyseti/gm-hub` (renamed from ktp-hub on 2026-11-12), public.
+  A branch is named by the piece of work it holds; the branch is the claim.
 - The checkout is `X:\Development\tabletop\gm-hub`, beside Kevin's other tabletop repositories. A branch's worktree
   is a sibling folder, `..\gm-hub.<name>`; never a worktree inside the checkout (`.claude/worktrees/` is gitignored
   in case a harness does).

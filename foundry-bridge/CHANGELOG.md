@@ -14,7 +14,7 @@ as ktp-foundry-bridge, and are in its history there.
 - **BREAKING** The module's ID is `gm-hub-bridge` and its title GM Hub Bridge (it was `ktp-foundry-bridge`, KTP
   Hub Bridge). Foundry treats it as a new module: uninstall the old one, install this one and enter the hub's
   WebSocket address again in each world (tabletop-layout).
-- The module lives in the gm-hub repository beside the hub, as `foundry-bridge/`, and has no manifest or download
-  link: it is installed from the zip in each GitHub Release, which a `foundry-bridge-vX.Y.Z` tag publishes
-  (tabletop-layout).
+- The module lives in the gm-hub repository beside the hub, as `foundry-bridge/`. Its manifest URL is
+  `https://github.com/aeriondyseti/gm-hub/releases/latest/download/module.json`, so Foundry's updater follows its
+  releases there (tabletop-layout).
 - Macros can reach the bridge as `gmHubBridge` as well as `ktpBridge` (tabletop-layout).
